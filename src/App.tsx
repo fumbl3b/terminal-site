@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Terminal, Github, Linkedin, Mail, ChevronRight, Download, RefreshCw } from 'lucide-react';
+import hljs from 'highlight.js';
+import 'highlight.js/styles/atom-one-dark.css';
 
 type Command = {
   command: string;
@@ -63,10 +65,15 @@ function CodeTypewriter({
   const [currentLine, setCurrentLine] = useState(0);
   const [currentChar, setCurrentChar] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
+  const [highlightedCode, setHighlightedCode] = useState<string>('');
   
   // Split code into lines on component mount
   useEffect(() => {
     setLines(code.split('\n'));
+    
+    // Highlight the full code for reference
+    const highlighted = hljs.highlight(code, { language: 'javascript' }).value;
+    setHighlightedCode(highlighted);
   }, [code]);
   
   // Typing effect
@@ -100,17 +107,28 @@ function CodeTypewriter({
     }
   }, [lines, currentLine, currentChar, speed, isComplete, onComplete]);
   
-  // Render typed code
+  // Generate current visible code with highlighting
+  const getCurrentHighlightedCode = () => {
+    // Combine all completed lines and current partial line
+    const completedLines = lines.slice(0, currentLine);
+    const currentPartialLine = currentLine < lines.length ? lines[currentLine].substring(0, currentChar) : '';
+    
+    const visibleCode = [...completedLines, currentPartialLine].join('\n');
+    
+    // Highlight the current visible code
+    if (visibleCode.trim() === '') return '';
+    return hljs.highlight(visibleCode, { language: 'javascript' }).value;
+  };
+  
+  // Render typed code with syntax highlighting
   return (
-    <pre className="bg-transparent text-sm text-green-400 font-mono overflow-x-auto">
-      {lines.slice(0, currentLine).map((line, i) => (
-        <div key={i} className="whitespace-pre">{line}</div>
-      ))}
+    <pre className="bg-[#282c34] rounded p-4 text-sm font-mono overflow-x-auto border border-gray-700">
+      <code 
+        className="hljs language-javascript" 
+        dangerouslySetInnerHTML={{ __html: getCurrentHighlightedCode() }} 
+      />
       {currentLine < lines.length && (
-        <div className="whitespace-pre">
-          {lines[currentLine].substring(0, currentChar)}
-          <span className="animate-pulse">▌</span>
-        </div>
+        <span className="animate-pulse text-white">▌</span>
       )}
     </pre>
   );
@@ -209,7 +227,7 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
   return (
     <div 
       ref={terminalRef}
-      className="bg-black text-green-400 p-4 rounded-md overflow-y-auto h-[calc(100vh-2rem)]"
+      className="bg-black text-green-400 p-4 rounded-md overflow-y-auto h-[calc(100vh-2rem)] max-h-[800px] w-full max-w-4xl mx-auto"
       onClick={() => inputRef.current?.focus()}
     >
       {history.map((entry, i) => (
@@ -231,7 +249,7 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
       ))}
       <div className="flex flex-col">
         <div className="flex items-center">
-          <span className="text-yellow-400">guest@portfolio</span>
+          <span className="text-yellow-400 whitespace-nowrap">guest@portfolio</span>
           <span className="text-gray-400">:</span>
           <span className="text-blue-400">~$</span>
           <input
@@ -240,8 +258,11 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
             value={currentCommand}
             onChange={(e) => onCommandChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="ml-2 bg-transparent border-none outline-none flex-1 text-green-400"
+            className="ml-2 bg-transparent border-none outline-none flex-1 text-green-400 w-full md:w-auto"
             autoFocus
+            spellCheck="false"
+            autoComplete="off"
+            autoCapitalize="off"
           />
         </div>
         {showSuggestions && suggestions.length > 0 && (
@@ -294,17 +315,17 @@ function WordGuessGame() {
     const formattedLetters = guess.split('').map((letter, index) => {
       if (letter === targetWord[index]) {
         // Correct letter, correct position - green
-        return <span key={index} className="text-green-500 font-bold">{letter}</span>;
+        return <span key={index} className="inline-flex justify-center items-center w-8 h-8 md:w-10 md:h-10 text-green-500 font-bold bg-green-900 bg-opacity-30 rounded m-0.5">{letter}</span>;
       } else if (targetWord.includes(letter)) {
         // Correct letter, wrong position - yellow
-        return <span key={index} className="text-yellow-500 font-bold">{letter}</span>;
+        return <span key={index} className="inline-flex justify-center items-center w-8 h-8 md:w-10 md:h-10 text-yellow-500 font-bold bg-yellow-900 bg-opacity-30 rounded m-0.5">{letter}</span>;
       } else {
         // Wrong letter - gray
-        return <span key={index} className="text-gray-500">{letter}</span>;
+        return <span key={index} className="inline-flex justify-center items-center w-8 h-8 md:w-10 md:h-10 text-gray-500 bg-gray-800 rounded m-0.5">{letter}</span>;
       }
     });
     
-    return <div className="flex space-x-1">{formattedLetters}</div>;
+    return <div className="flex flex-wrap md:flex-nowrap">{formattedLetters}</div>;
   };
   
   // Process a guess and return the formatted output
@@ -810,9 +831,9 @@ function DownloadSection() {
   );
 
   return (
-    <div className="min-h-screen bg-black text-green-400 font-mono p-4">
+    <div className="min-h-screen bg-black text-green-400 font-mono p-4 md:px-8">
       {showAllContent ? (
-        <div>
+        <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl text-yellow-400 mb-8">Harrison Winkler's Portfolio</h1>
           {allContentSection}
           <button 
@@ -823,9 +844,9 @@ function DownloadSection() {
           </button>
         </div>
       ) : (
-        <>
+        <div className="flex flex-col items-center">
           {showWelcome ? (
-            <div className="flex items-center mb-8">
+            <div className="flex items-center mb-8 w-full max-w-4xl mx-auto">
               <Terminal className="w-6 h-6 mr-2" />
               <TypewriterText 
                 text="Welcome to Harry's Portfolio Terminal. Type 'help' for available commands." 
@@ -833,12 +854,16 @@ function DownloadSection() {
               />
             </div>
           ) : (
-            <TerminalInterface
-              history={history}
-              currentCommand={currentCommand}
-              onCommandChange={setCurrentCommand}
-              onCommandSubmit={handleCommand}
-            />
+            <div className="w-full flex flex-col items-center">
+              <div className="fixed top-0 left-0 right-0 h-12 bg-gradient-to-b from-black to-transparent z-10 pointer-events-none md:hidden"></div>
+              <TerminalInterface
+                history={history}
+                currentCommand={currentCommand}
+                onCommandChange={setCurrentCommand}
+                onCommandSubmit={handleCommand}
+              />
+              <div className="fixed bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black to-transparent z-10 pointer-events-none md:hidden"></div>
+            </div>
           )}
           <button 
             onClick={() => setShowAllContent(true)}
@@ -846,7 +871,7 @@ function DownloadSection() {
           >
             $ just-show-me-everything
           </button>
-        </>
+        </div>
       )}
     </div>
   );
