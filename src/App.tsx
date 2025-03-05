@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Github, Linkedin, Mail, ChevronRight } from 'lucide-react';
+import { Terminal, Github, Linkedin, Mail, ChevronRight, Download } from 'lucide-react';
 
 type Command = {
   command: string;
@@ -12,6 +12,7 @@ const AVAILABLE_COMMANDS = [
   'skills',
   'experience',
   'contact',
+  'download',
   'clear',
   'help'
 ];
@@ -171,6 +172,7 @@ function App() {
   const [history, setHistory] = useState<Command[]>([]);
   const [currentCommand, setCurrentCommand] = useState('');
   const [showWelcome, setShowWelcome] = useState(true);
+  const [showAllContent, setShowAllContent] = useState(false);
 
   const aboutSection = (
     <Section title="About Me">
@@ -262,6 +264,22 @@ function App() {
       </div>
     </Section>
   );
+  
+  const downloadSection = (
+    <Section title="Download Resume">
+      <div className="text-gray-300 mb-4">
+        Click below to download my resume:
+      </div>
+      <a 
+        href="/harrison_winkler.pdf" 
+        download="harrison_winkler.pdf"
+        className="inline-flex items-center px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-600 transition-colors"
+      >
+        <Download className="w-4 h-4 mr-2" />
+        Download Resume
+      </a>
+    </Section>
+  );
 
   const helpText = (
     <div className="text-gray-300">
@@ -272,6 +290,7 @@ function App() {
         <li>skills - List technical skills</li>
         <li>experience - Show work experience</li>
         <li>contact - Display contact information</li>
+        <li>download - Download my resume</li>
         <li>clear - Clear the terminal</li>
         <li>help - Show this help message</li>
       </ul>
@@ -298,6 +317,9 @@ function App() {
       case 'contact':
         output = contactSection;
         break;
+      case 'download':
+        output = downloadSection;
+        break;
       case 'help':
         output = helpText;
         break;
@@ -318,23 +340,55 @@ function App() {
     setCurrentCommand('');
   };
 
+  const allContentSection = (
+    <div className="mt-8 space-y-12">
+      {aboutSection}
+      {skillsSection}
+      {experienceSection}
+      {projectSection}
+      {contactSection}
+      {downloadSection}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-black text-green-400 font-mono p-4">
-      {showWelcome ? (
-        <div className="flex items-center mb-8">
-          <Terminal className="w-6 h-6 mr-2" />
-          <TypewriterText 
-            text="Welcome to Harry's Portfolio Terminal. Type 'help' for available commands." 
-            onComplete={() => setShowWelcome(false)}
-          />
+      {showAllContent ? (
+        <div>
+          <h1 className="text-3xl text-yellow-400 mb-8">Harrison Winkler's Portfolio</h1>
+          {allContentSection}
+          <button 
+            onClick={() => setShowAllContent(false)}
+            className="mt-8 text-blue-400 border border-blue-400 px-4 py-2 rounded font-mono hover:bg-blue-900 hover:bg-opacity-30 transition-colors"
+          >
+            $ return-to-terminal
+          </button>
         </div>
       ) : (
-        <TerminalInterface
-          history={history}
-          currentCommand={currentCommand}
-          onCommandChange={setCurrentCommand}
-          onCommandSubmit={handleCommand}
-        />
+        <>
+          {showWelcome ? (
+            <div className="flex items-center mb-8">
+              <Terminal className="w-6 h-6 mr-2" />
+              <TypewriterText 
+                text="Welcome to Harry's Portfolio Terminal. Type 'help' for available commands." 
+                onComplete={() => setShowWelcome(false)}
+              />
+            </div>
+          ) : (
+            <TerminalInterface
+              history={history}
+              currentCommand={currentCommand}
+              onCommandChange={setCurrentCommand}
+              onCommandSubmit={handleCommand}
+            />
+          )}
+          <button 
+            onClick={() => setShowAllContent(true)}
+            className="fixed bottom-4 left-1/2 transform -translate-x-1/2 text-gray-500 hover:text-green-400 text-sm border-b border-dashed border-gray-700 pb-1 transition-colors"
+          >
+            $ just-show-me-everything
+          </button>
+        </>
       )}
     </div>
   );
