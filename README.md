@@ -10,6 +10,8 @@ A unique, interactive terminal-style portfolio website built with React, TypeScr
 - Tab completion for available commands
 - Command history display
 - Typewriter text effect for welcome message
+- Word-Guess game (like Wordle) played directly in the terminal
+- "Just show me everything" option for quick portfolio access
 - Responsive design for all screen sizes
 - Available commands:
   - `about`: Display information about me
@@ -18,8 +20,24 @@ A unique, interactive terminal-style portfolio website built with React, TypeScr
   - `experience`: Show work experience
   - `contact`: Display contact information
   - `download`: Download my resume
+  - `game`: Play a word guessing game
   - `clear`: Clear the terminal
   - `help`: Show available commands
+
+## 🎮 Word-Guess Game
+
+Integrated directly into the terminal interface:
+- Guess a random 5-letter word in 6 attempts or less
+- Color-coded feedback (green for correct position, yellow for correct letter in wrong position)
+- 65+ common words in the word bank for an enjoyable experience
+- Type `exit` any time to quit the game
+
+## 🔍 Quick Access Mode
+
+For visitors who prefer not to use the terminal interface:
+- Click "$ just-show-me-everything" at the bottom of the page
+- View all portfolio sections at once in a clean layout
+- Return to the terminal interface with a single click
 
 ## 🛠️ Tech Stack
 
@@ -89,7 +107,8 @@ To personalize this portfolio for your own use:
 1. Update personal information in `src/App.tsx`
 2. Replace resume PDF in `public/` directory
 3. Customize colors and styling using Tailwind classes
-4. Add or remove commands as needed
+4. Modify the word bank for the word-guess game
+5. Add or remove commands as needed
 
 ## 📄 License
 
