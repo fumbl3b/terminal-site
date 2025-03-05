@@ -172,8 +172,30 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
 // WordGuessGame Component for CLI-style interface
 function WordGuessGame() {
   const wordBank = [
-    'REACT', 'SWIFT', 'SCALA', 'MOUNT', 'PIXEL', 
-    'FLASK', 'BYTES', 'GHOST', 'CHILD', 'NINJA'
+    // Common words that anyone would know
+    'APPLE', 'BEACH', 'CHAIR', 'DANCE', 'EARTH', 
+    'FLAME', 'GRAPE', 'HOUSE', 'JUICE', 'KNIFE',
+    'LIGHT', 'MONEY', 'MUSIC', 'OCEAN', 'PARTY',
+    'QUEEN', 'RIVER', 'SMILE', 'TABLE', 'WATER',
+    
+    // Animals
+    'TIGER', 'PANDA', 'SHEEP', 'HORSE', 'SNAKE',
+    'EAGLE', 'ROBIN', 'WHALE', 'MOUSE', 'ZEBRA',
+    
+    // Colors
+    'GREEN', 'WHITE', 'BLACK', 'BROWN', 'PEACH',
+    
+    // Food
+    'PIZZA', 'SALAD', 'BREAD', 'STEAK', 'OLIVE',
+    'FRUIT', 'CANDY', 'PASTA', 'CREAM', 'DONUT',
+    
+    // Some tech-related words (but common ones)
+    'PHONE', 'MOUSE', 'CLOUD', 'EMAIL', 'VIDEO',
+    'MEDIA', 'PHOTO', 'SOUND', 'POWER', 'ROBOT',
+    
+    // Places
+    'BEACH', 'HOTEL', 'STORE', 'TOWER', 'PLAZA',
+    'FIELD', 'LAKE', 'HOUSE', 'CABIN', 'CLIFF'
   ];
   
   // Get a random word from the bank
