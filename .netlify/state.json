@@ -1,0 +1,21 @@
+{
+	"siteId": "f1437b08-a772-4196-8181-f6a52e825445",
+	"geolocation": {
+		"data": {
+			"city": "Philadelphia",
+			"country": {
+				"code": "US",
+				"name": "United States"
+			},
+			"subdivision": {
+				"code": "PA",
+				"name": "Pennsylvania"
+			},
+			"timezone": "America/New_York",
+			"latitude": 39.9792,
+			"longitude": -75.1279,
+			"postalCode": "19125"
+		},
+		"timestamp": 1741207855245
+	}
+}
