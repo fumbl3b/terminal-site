@@ -12,6 +12,7 @@ A unique, interactive terminal-style portfolio website built with React, TypeScr
 - Typewriter text effect for welcome message
 - Word-Guess game (like Wordle) played directly in the terminal
 - "Just show me everything" option for quick portfolio access
+- "View source" feature to see React code before rendering components
 - Responsive design for all screen sizes
 - Available commands:
   - `about`: Display information about me
@@ -38,6 +39,15 @@ For visitors who prefer not to use the terminal interface:
 - Click "$ just-show-me-everything" at the bottom of the page
 - View all portfolio sections at once in a clean layout
 - Return to the terminal interface with a single click
+
+## 💻 Code Typing Effect
+
+Educational feature to see how React components are built:
+- Every component command shows its source code being typed in real-time
+- Watch the code type out line by line in the terminal
+- Component automatically renders after the code is fully typed
+- Simulates the coding experience for visitors
+- Great for demonstrating React component structure to technical visitors
 
 ## 🛠️ Tech Stack
 

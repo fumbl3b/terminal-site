@@ -4,6 +4,8 @@ import { Terminal, Github, Linkedin, Mail, ChevronRight, Download, RefreshCw } f
 type Command = {
   command: string;
   output: React.ReactNode;
+  isTyping?: boolean;
+  pendingComponent?: React.ReactNode;
 };
 
 const AVAILABLE_COMMANDS = [
@@ -18,7 +20,17 @@ const AVAILABLE_COMMANDS = [
   'help'
 ];
 
-function TypewriterText({ text, speed = 50, onComplete }: { text: string; speed?: number; onComplete?: () => void }) {
+function TypewriterText({ 
+  text, 
+  speed = 50, 
+  onComplete, 
+  className = '' 
+}: { 
+  text: string; 
+  speed?: number; 
+  onComplete?: () => void;
+  className?: string;
+}) {
   const [displayedText, setDisplayedText] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -34,7 +46,74 @@ function TypewriterText({ text, speed = 50, onComplete }: { text: string; speed?
     }
   }, [currentIndex, text, speed, onComplete]);
 
-  return <span>{displayedText}</span>;
+  return <span className={className}>{displayedText}</span>;
+}
+
+// Component for typing multiline code with syntax highlighting
+function CodeTypewriter({ 
+  code, 
+  speed = 1, 
+  onComplete 
+}: { 
+  code: string; 
+  speed?: number; 
+  onComplete: () => void 
+}) {
+  const [lines, setLines] = useState<string[]>([]);
+  const [currentLine, setCurrentLine] = useState(0);
+  const [currentChar, setCurrentChar] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
+  
+  // Split code into lines on component mount
+  useEffect(() => {
+    setLines(code.split('\n'));
+  }, [code]);
+  
+  // Typing effect
+  useEffect(() => {
+    if (lines.length === 0) return;
+    
+    if (currentLine < lines.length) {
+      const line = lines[currentLine];
+      
+      if (currentChar < line.length) {
+        // Still typing the current line
+        const timer = setTimeout(() => {
+          setCurrentChar(prev => prev + 1);
+        }, speed);
+        return () => clearTimeout(timer);
+      } else {
+        // Move to next line
+        const timer = setTimeout(() => {
+          setCurrentLine(prev => prev + 1);
+          setCurrentChar(0);
+        }, speed * 5); // Slightly longer pause at end of line
+        return () => clearTimeout(timer);
+      }
+    } else if (!isComplete) {
+      // All lines complete
+      setIsComplete(true);
+      // Wait a moment before completing
+      setTimeout(() => {
+        onComplete();
+      }, 500);
+    }
+  }, [lines, currentLine, currentChar, speed, isComplete, onComplete]);
+  
+  // Render typed code
+  return (
+    <pre className="bg-transparent text-sm text-green-400 font-mono overflow-x-auto">
+      {lines.slice(0, currentLine).map((line, i) => (
+        <div key={i} className="whitespace-pre">{line}</div>
+      ))}
+      {currentLine < lines.length && (
+        <div className="whitespace-pre">
+          {lines[currentLine].substring(0, currentChar)}
+          <span className="animate-pulse">▌</span>
+        </div>
+      )}
+    </pre>
+  );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -141,7 +220,13 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
             <span className="text-blue-400">~$</span>
             <span className="ml-2">{entry.command}</span>
           </div>
-          <div className="mt-2 ml-4">{entry.output}</div>
+          <div className="mt-2 ml-4">
+            {entry.isTyping && entry.pendingComponent ? (
+              <div className="text-gray-400">Rendering component...</div>
+            ) : (
+              entry.output
+            )}
+          </div>
         </div>
       ))}
       <div className="flex flex-col">
@@ -433,8 +518,147 @@ function App() {
         <li>clear - Clear the terminal</li>
         <li>help - Show this help message</li>
       </ul>
+      <div className="mt-3 text-gray-400 italic">
+        Note: All commands will show the React component code being typed before rendering
+      </div>
     </div>
   );
+
+  // Function to get component source code as a string
+  const getComponentSourceCode = (componentName: string) => {
+    const componentCodes: Record<string, string> = {
+      about: `
+// About Section Component
+function AboutSection() {
+  return (
+    <Section title="About Me">
+      <p className="text-gray-300 leading-relaxed">
+        Proficient Software Engineer versed in designing, developing, 
+        and maintaining both mobile and web applications. 
+        Extensive experience deploying and maintaining cloud services. 
+        Skilled in Java, Kotlin, Javascript ES6, Typescript and Python. 
+        Experience with Test-Driven-Development, ADA Accessible UI implementation, 
+        continuous integration tools, and agile software development methodologies.
+      </p>
+    </Section>
+  );
+}`,
+      projects: `
+// Projects Section Component
+function ProjectSection() {
+  return (
+    <Section title="Featured Project">
+      <div className="bg-gray-900 p-4 rounded-md mb-4">
+        <h3 className="text-yellow-400 text-lg mb-2">Untitled Resume Tuner</h3>
+        <p className="text-gray-300 mb-4">
+          Resume Tuner is an AI-powered web app designed to optimize your resume 
+          for any job application. With a React frontend and Flask backend, 
+          it analyzes both your resume and the job description to extract key data, 
+          suggest tailored improvements, and ensure better alignment with 
+          applicant tracking systems.
+        </p>
+        <a 
+          href="https://github.com" 
+          className="inline-flex items-center text-blue-400 hover:text-blue-300"
+        >
+          <Github className="w-4 h-4 mr-2" />
+          View on GitHub
+        </a>
+      </div>
+    </Section>
+  );
+}`,
+      skills: `
+// Skills Section Component
+function SkillsSection() {
+  return (
+    <Section title="Skills">
+      <SkillCategory 
+        title="Programming Languages" 
+        skills={["Kotlin", "Java", "TypeScript", "Python", "JavaScript", "C#"]} 
+      />
+      <SkillCategory 
+        title="Frameworks" 
+        skills={["React", "Node.js", "Android SDK", "Next.js", "Express", "Django"]} 
+      />
+      <SkillCategory 
+        title="Cloud & DevOps" 
+        skills={["AWS", "Docker", "Kubernetes", "PostgreSQL", "MongoDB", "Redis"]} 
+      />
+    </Section>
+  );
+}`,
+      experience: `
+// Experience Section Component
+function ExperienceSection() {
+  return (
+    <Section title="Experience">
+      <Experience 
+        company="JP Morgan Chase & Co"
+        role="Software Engineer II"
+        period="Aug 2023 - June 2024"
+        location="Wilmington, DE"
+        responsibilities={[
+          "Maintained and enhanced legacy Java applications",
+          "Developed new features in Spring Boot and React",
+          "Managed CI pipelines and code quality"
+        ]}
+      />
+      <Experience 
+        company="Wells Fargo"
+        role="Android Developer"
+        period="Dec 2021 - Jul 2023"
+        location="San Francisco, CA / Remote"
+        responsibilities={[
+          "Contributed to Android app redevelopment (10M+ downloads)",
+          "Implemented deep linking and Zelle API integration",
+          "Launched LifeSync financial planning tool"
+        ]}
+      />
+    </Section>
+  );
+}`,
+      contact: `
+// Contact Section Component
+function ContactSection() {
+  return (
+    <Section title="Contact">
+      <div className="flex flex-col space-y-2">
+        <a href="mailto:harry@fumblebee.site" className="flex items-center text-gray-300 hover:text-green-400">
+          <Mail className="w-4 h-4 mr-2" />
+          harry@fumblebee.site
+        </a>
+        <a href="https://linkedin.com/in/harry-winkler" className="flex items-center text-gray-300 hover:text-green-400">
+          <Linkedin className="w-4 h-4 mr-2" />
+          linkedin.com/in/harry-winkler
+        </a>
+      </div>
+    </Section>
+  );
+}`,
+      download: `
+// Download Section Component
+function DownloadSection() {
+  return (
+    <Section title="Download Resume">
+      <div className="text-gray-300 mb-4">
+        Click below to download my resume:
+      </div>
+      <a 
+        href="/harrison_winkler.pdf" 
+        download="harrison_winkler.pdf"
+        className="inline-flex items-center px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-600 transition-colors"
+      >
+        <Download className="w-4 h-4 mr-2" />
+        Download Resume
+      </a>
+    </Section>
+  );
+}`
+    };
+    
+    return componentCodes[componentName] || null;
+  };
 
   const handleCommand = (cmd: string) => {
     const command = cmd.trim().toLowerCase();
@@ -463,24 +687,58 @@ function App() {
       return;
     }
 
+    // Create a processing function for component commands that need code typing
+    const processComponentCommand = (component: React.ReactNode, name: string) => {
+      const code = getComponentSourceCode(name);
+      if (!code) {
+        return <span className="text-red-400">Component code not available.</span>;
+      }
+
+      // First add the code typing animation
+      setHistory(prev => [...prev, { 
+        command: cmd, 
+        output: <CodeTypewriter code={code} onComplete={() => {
+          // When typing completes, replace the entry with the actual component
+          setHistory(prev => {
+            // Find the index of the command we just added
+            const index = prev.findIndex(entry => 
+              entry.command === cmd && entry.output && typeof entry.output !== 'string'
+            );
+            
+            if (index !== -1) {
+              // Create a new history array with the updated entry
+              const newHistory = [...prev];
+              newHistory[index] = { command: cmd, output: component };
+              return newHistory;
+            }
+            return prev;
+          });
+        }} />
+      }]);
+
+      setCurrentCommand('');
+      // Return null since we're handling the output directly
+      return null;
+    };
+
     switch (command) {
       case 'about':
-        output = aboutSection;
+        output = processComponentCommand(aboutSection, 'about');
         break;
       case 'projects':
-        output = projectSection;
+        output = processComponentCommand(projectSection, 'projects');
         break;
       case 'skills':
-        output = skillsSection;
+        output = processComponentCommand(skillsSection, 'skills');
         break;
       case 'experience':
-        output = experienceSection;
+        output = processComponentCommand(experienceSection, 'experience');
         break;
       case 'contact':
-        output = contactSection;
+        output = processComponentCommand(contactSection, 'contact');
         break;
       case 'download':
-        output = downloadSection;
+        output = processComponentCommand(downloadSection, 'download');
         break;
       case 'game':
         // Initialize the word-guess game
@@ -532,9 +790,11 @@ function App() {
         output = <span className="text-red-400">Command not found. Type 'help' for available commands.</span>;
     }
 
-    if (command !== '') {
+    // Only add to history if we have output to show and we haven't already handled it
+    if (output !== null && command !== '') {
       setHistory(prev => [...prev, { command: cmd, output }]);
     }
+    
     setCurrentCommand('');
   };
 
