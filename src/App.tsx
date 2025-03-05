@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Github, Linkedin, Mail, ChevronRight, Download } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Terminal, Github, Linkedin, Mail, ChevronRight, Download, RefreshCw } from 'lucide-react';
 
 type Command = {
   command: string;
@@ -13,6 +13,7 @@ const AVAILABLE_COMMANDS = [
   'experience',
   'contact',
   'download',
+  'game',
   'clear',
   'help'
 ];
@@ -168,11 +169,126 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
   );
 }
 
+// WordGuessGame Component for CLI-style interface
+function WordGuessGame() {
+  const wordBank = [
+    'REACT', 'SWIFT', 'SCALA', 'MOUNT', 'PIXEL', 
+    'FLASK', 'BYTES', 'GHOST', 'CHILD', 'NINJA'
+  ];
+  
+  // Get a random word from the bank
+  const getRandomWord = () => {
+    const randomIndex = Math.floor(Math.random() * wordBank.length);
+    return wordBank[randomIndex];
+  };
+  
+  // Format a guess with color indicators
+  const formatGuessOutput = (guess: string, targetWord: string) => {
+    const formattedLetters = guess.split('').map((letter, index) => {
+      if (letter === targetWord[index]) {
+        // Correct letter, correct position - green
+        return <span key={index} className="text-green-500 font-bold">{letter}</span>;
+      } else if (targetWord.includes(letter)) {
+        // Correct letter, wrong position - yellow
+        return <span key={index} className="text-yellow-500 font-bold">{letter}</span>;
+      } else {
+        // Wrong letter - gray
+        return <span key={index} className="text-gray-500">{letter}</span>;
+      }
+    });
+    
+    return <div className="flex space-x-1">{formattedLetters}</div>;
+  };
+  
+  // Process a guess and return the formatted output
+  const processGuess = (guess: string, targetWord: string, attemptNum: number, maxAttempts: number) => {
+    const upperGuess = guess.toUpperCase();
+    
+    // Check if the guess is 5 letters
+    if (upperGuess.length !== 5) {
+      return {
+        output: <span className="text-red-400">Your guess must be exactly 5 letters.</span>,
+        isCorrect: false,
+        isValid: false
+      };
+    }
+    
+    // Process a valid guess
+    const formattedGuess = formatGuessOutput(upperGuess, targetWord);
+    const attemptsLeft = maxAttempts - attemptNum;
+    
+    if (upperGuess === targetWord) {
+      return {
+        output: (
+          <div className="space-y-2">
+            <div className="flex space-x-2">
+              <div>{formattedGuess}</div>
+              <span className="text-green-400 ml-2">Correct!</span>
+            </div>
+            <div className="text-green-400">
+              Congratulations! You guessed the word {targetWord} in {attemptNum} {attemptNum === 1 ? 'attempt' : 'attempts'}! 🎉
+            </div>
+            <div className="text-gray-400 mt-2">
+              Type 'game' to play again.
+            </div>
+          </div>
+        ),
+        isCorrect: true,
+        isValid: true
+      };
+    } else if (attemptNum >= maxAttempts) {
+      return {
+        output: (
+          <div className="space-y-2">
+            <div className="flex space-x-2">
+              <div>{formattedGuess}</div>
+              <span className="text-red-400 ml-2">Wrong</span>
+            </div>
+            <div className="text-red-400">
+              Game over! You've used all your attempts. The word was {targetWord}.
+            </div>
+            <div className="text-gray-400 mt-2">
+              Type 'game' to play again.
+            </div>
+          </div>
+        ),
+        isCorrect: false,
+        isValid: true
+      };
+    } else {
+      return {
+        output: (
+          <div className="space-y-2">
+            <div className="flex space-x-2">
+              <div>{formattedGuess}</div>
+              <span className="text-yellow-400 ml-2">Try again</span>
+            </div>
+            <div className="text-gray-400">
+              You have {attemptsLeft} {attemptsLeft === 1 ? 'attempt' : 'attempts'} left.
+            </div>
+          </div>
+        ),
+        isCorrect: false,
+        isValid: true
+      };
+    }
+  };
+  
+  return { getRandomWord, processGuess };
+}
+
 function App() {
   const [history, setHistory] = useState<Command[]>([]);
   const [currentCommand, setCurrentCommand] = useState('');
   const [showWelcome, setShowWelcome] = useState(true);
   const [showAllContent, setShowAllContent] = useState(false);
+  
+  // Word guess game state
+  const [isPlayingGame, setIsPlayingGame] = useState(false);
+  const [gameWord, setGameWord] = useState('');
+  const [gameAttempts, setGameAttempts] = useState(0);
+  const [gameMaxAttempts] = useState(6);
+  const wordGuessGame = WordGuessGame();
 
   const aboutSection = (
     <Section title="About Me">
@@ -291,6 +407,7 @@ function App() {
         <li>experience - Show work experience</li>
         <li>contact - Display contact information</li>
         <li>download - Download my resume</li>
+        <li>game - Play a word guessing game</li>
         <li>clear - Clear the terminal</li>
         <li>help - Show this help message</li>
       </ul>
@@ -300,6 +417,29 @@ function App() {
   const handleCommand = (cmd: string) => {
     const command = cmd.trim().toLowerCase();
     let output: React.ReactNode;
+
+    // Handle guesses for the word-guess game
+    if (isPlayingGame && command !== 'exit') {
+      if (command === '') {
+        output = <span className="text-gray-400">Please enter a 5-letter word as your guess.</span>;
+      } else {
+        const result = wordGuessGame.processGuess(command, gameWord, gameAttempts + 1, gameMaxAttempts);
+        
+        if (result.isValid) {
+          setGameAttempts(prev => prev + 1);
+        }
+        
+        if (result.isCorrect || (result.isValid && gameAttempts + 1 >= gameMaxAttempts)) {
+          setIsPlayingGame(false);
+        }
+        
+        output = result.output;
+      }
+      
+      setHistory(prev => [...prev, { command: cmd, output }]);
+      setCurrentCommand('');
+      return;
+    }
 
     switch (command) {
       case 'about':
@@ -319,6 +459,42 @@ function App() {
         break;
       case 'download':
         output = downloadSection;
+        break;
+      case 'game':
+        // Initialize the word-guess game
+        const newWord = wordGuessGame.getRandomWord();
+        setGameWord(newWord);
+        setGameAttempts(0);
+        setIsPlayingGame(true);
+        output = (
+          <div className="space-y-2">
+            <div className="text-green-400 font-bold">🎮 Word-Guess Game</div>
+            <div className="text-gray-300">
+              I'm thinking of a 5-letter word. You have {gameMaxAttempts} attempts to guess it.
+            </div>
+            <div className="text-gray-300">
+              Type your guess (5 letters) and press Enter.
+            </div>
+            <div className="text-gray-400 mt-2">
+              <span className="text-green-500 font-bold">Green</span> = correct letter in correct position
+              <br />
+              <span className="text-yellow-500 font-bold">Yellow</span> = correct letter in wrong position
+              <br />
+              <span className="text-gray-500">Gray</span> = letter not in the word
+            </div>
+            <div className="text-gray-400 italic mt-2">
+              (Type 'exit' to quit the game)
+            </div>
+          </div>
+        );
+        break;
+      case 'exit':
+        if (isPlayingGame) {
+          setIsPlayingGame(false);
+          output = <span className="text-yellow-400">Word-Guess game exited. The word was {gameWord}.</span>;
+        } else {
+          output = <span className="text-red-400">No active game to exit. Type 'help' for available commands.</span>;
+        }
         break;
       case 'help':
         output = helpText;
