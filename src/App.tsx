@@ -419,7 +419,7 @@ function App() {
           tracking systems.
         </p>
         <a 
-          href="https://github.com" 
+          href="https://github.com/fumbl3b/resume-updater" 
           className="inline-flex items-center text-blue-400 hover:text-blue-300"
         >
           <Github className="w-4 h-4 mr-2" />
