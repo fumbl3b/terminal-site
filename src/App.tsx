@@ -354,37 +354,73 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
 
 // WordGuessGame Component for CLI-style interface
 function WordGuessGame() {
-  const wordBank = [
-    // Common words that anyone would know
-    'APPLE', 'BEACH', 'CHAIR', 'DANCE', 'EARTH', 
-    'FLAME', 'GRAPE', 'HOUSE', 'JUICE', 'KNIFE',
-    'LIGHT', 'MONEY', 'MUSIC', 'OCEAN', 'PARTY',
-    'QUEEN', 'RIVER', 'SMILE', 'TABLE', 'WATER',
-    
-    // Animals
-    'TIGER', 'PANDA', 'SHEEP', 'HORSE', 'SNAKE',
-    'EAGLE', 'ROBIN', 'WHALE', 'MOUSE', 'ZEBRA',
-    
-    // Colors
-    'GREEN', 'WHITE', 'BLACK', 'BROWN', 'PEACH',
-    
-    // Food
-    'PIZZA', 'SALAD', 'BREAD', 'STEAK', 'OLIVE',
-    'FRUIT', 'CANDY', 'PASTA', 'CREAM', 'DONUT',
-    
-    // Some tech-related words (but common ones)
-    'PHONE', 'MOUSE', 'CLOUD', 'EMAIL', 'VIDEO',
-    'MEDIA', 'PHOTO', 'SOUND', 'POWER', 'ROBOT',
-    
-    // Places
-    'BEACH', 'HOTEL', 'STORE', 'TOWER', 'PLAZA',
-    'FIELD', 'LAKE', 'HOUSE', 'CABIN', 'CLIFF'
-  ];
+  // Organized word bank with categories
+  const wordCategories = {
+    'Common Objects': ['APPLE', 'CHAIR', 'FLAME', 'GRAPE', 'HOUSE', 'JUICE', 'KNIFE', 'LIGHT', 'MONEY', 'TABLE', 'WATER'],
+    'Animals': ['TIGER', 'PANDA', 'SHEEP', 'HORSE', 'SNAKE', 'EAGLE', 'ROBIN', 'WHALE', 'MOUSE', 'ZEBRA'],
+    'Colors': ['GREEN', 'WHITE', 'BLACK', 'BROWN', 'PEACH'],
+    'Food': ['PIZZA', 'SALAD', 'BREAD', 'STEAK', 'OLIVE', 'FRUIT', 'CANDY', 'PASTA', 'CREAM', 'DONUT'],
+    'Technology': ['PHONE', 'MOUSE', 'CLOUD', 'EMAIL', 'VIDEO', 'MEDIA', 'PHOTO', 'SOUND', 'POWER', 'ROBOT'],
+    'Places': ['BEACH', 'HOTEL', 'STORE', 'TOWER', 'PLAZA', 'FIELD', 'LAKE', 'HOUSE', 'CABIN', 'CLIFF'],
+    'Activities': ['DANCE', 'SMILE', 'PARTY', 'MUSIC', 'OCEAN', 'RIVER']
+  };
   
-  // Get a random word from the bank
+  // Flatten word bank for random selection
+  const flatWordBank = Object.values(wordCategories).flat();
+  
+  // Get a random word and its category
   const getRandomWord = () => {
-    const randomIndex = Math.floor(Math.random() * wordBank.length);
-    return wordBank[randomIndex];
+    const randomIndex = Math.floor(Math.random() * flatWordBank.length);
+    const selectedWord = flatWordBank[randomIndex];
+    
+    // Find the category for this word
+    const category = Object.keys(wordCategories).find(cat => 
+      wordCategories[cat as keyof typeof wordCategories].includes(selectedWord)
+    ) || 'Unknown';
+    
+    return { word: selectedWord, category };
+  };
+  
+  // Get hint for the current word
+  const getHint = (category: string) => {
+    return `Hint: This word is in the category of "${category}".`;
+  };
+  
+  // Format the alphabet to show guessed letters
+  const formatAlphabet = (guessedLetters: Set<string>, targetWord: string) => {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    
+    return (
+      <div className="mt-3 mb-1">
+        <div className="text-gray-400 mb-1">Letters used:</div>
+        <div className="flex flex-wrap">
+          {alphabet.split('').map(letter => {
+            if (!guessedLetters.has(letter)) {
+              // Not guessed yet
+              return (
+                <span key={letter} className="inline-flex justify-center items-center w-6 h-6 text-gray-400 border border-gray-700 rounded m-0.5">
+                  {letter}
+                </span>
+              );
+            } else if (targetWord.includes(letter)) {
+              // Guessed and in word
+              return (
+                <span key={letter} className="inline-flex justify-center items-center w-6 h-6 text-blue-400 font-bold border border-blue-700 bg-blue-900 bg-opacity-30 rounded m-0.5">
+                  {letter}
+                </span>
+              );
+            } else {
+              // Guessed but not in word
+              return (
+                <span key={letter} className="inline-flex justify-center items-center w-6 h-6 text-red-400 font-bold border border-red-700 bg-red-900 bg-opacity-30 rounded m-0.5">
+                  {letter}
+                </span>
+              );
+            }
+          })}
+        </div>
+      </div>
+    );
   };
   
   // Format a guess with color indicators
@@ -406,13 +442,32 @@ function WordGuessGame() {
   };
   
   // Process a guess and return the formatted output
-  const processGuess = (guess: string, targetWord: string, attemptNum: number, maxAttempts: number) => {
+  const processGuess = (
+    guess: string, 
+    targetWord: string, 
+    category: string,
+    attemptNum: number, 
+    maxAttempts: number,
+    guessedLetters: Set<string>,
+    showHint: boolean
+  ) => {
     const upperGuess = guess.toUpperCase();
+    
+    // Track guessed letters
+    upperGuess.split('').forEach(letter => {
+      guessedLetters.add(letter);
+    });
     
     // Check if the guess is 5 letters
     if (upperGuess.length !== 5) {
       return {
-        output: <span className="text-red-400">Your guess must be exactly 5 letters.</span>,
+        output: (
+          <div className="space-y-2">
+            <span className="text-red-400">Your guess must be exactly 5 letters.</span>
+            {showHint && <div className="text-blue-400 mt-2">{getHint(category)}</div>}
+            {formatAlphabet(guessedLetters, targetWord)}
+          </div>
+        ),
         isCorrect: false,
         isValid: false
       };
@@ -433,6 +488,7 @@ function WordGuessGame() {
             <div className="text-green-400">
               Congratulations! You guessed the word {targetWord} in {attemptNum} {attemptNum === 1 ? 'attempt' : 'attempts'}! 🎉
             </div>
+            {formatAlphabet(guessedLetters, targetWord)}
             <div className="text-gray-400 mt-2">
               Type 'game' to play again.
             </div>
@@ -452,6 +508,7 @@ function WordGuessGame() {
             <div className="text-red-400">
               Game over! You've used all your attempts. The word was {targetWord}.
             </div>
+            {formatAlphabet(guessedLetters, targetWord)}
             <div className="text-gray-400 mt-2">
               Type 'game' to play again.
             </div>
@@ -468,8 +525,13 @@ function WordGuessGame() {
               <div>{formattedGuess}</div>
               <span className="text-yellow-400 ml-2">Try again</span>
             </div>
+            {showHint && <div className="text-blue-400 mt-2">{getHint(category)}</div>}
             <div className="text-gray-400">
               You have {attemptsLeft} {attemptsLeft === 1 ? 'attempt' : 'attempts'} left.
+            </div>
+            {formatAlphabet(guessedLetters, targetWord)}
+            <div className="text-gray-400 italic mt-2">
+              Type 'hint' for a hint about the word
             </div>
           </div>
         ),
@@ -479,7 +541,7 @@ function WordGuessGame() {
     }
   };
   
-  return { getRandomWord, processGuess };
+  return { getRandomWord, processGuess, getHint };
 }
 
 function MatrixRain({ onClose }: { onClose: () => void }) {
@@ -671,8 +733,11 @@ function App() {
   // Word guess game state
   const [isPlayingGame, setIsPlayingGame] = useState(false);
   const [gameWord, setGameWord] = useState('');
+  const [gameCategory, setGameCategory] = useState('');
   const [gameAttempts, setGameAttempts] = useState(0);
   const [gameMaxAttempts] = useState(6);
+  const [gameGuessedLetters, setGameGuessedLetters] = useState<Set<string>>(new Set());
+  const [showGameHint, setShowGameHint] = useState(false);
   const wordGuessGame = WordGuessGame();
 
   const aboutSection = (
@@ -964,11 +1029,19 @@ function HelpSection() {
     let output: React.ReactNode;
 
     // Handle guesses for the word-guess game
-    if (isPlayingGame && command !== 'exit') {
+    if (isPlayingGame && !['exit', 'hint'].includes(command)) {
       if (command === '') {
         output = <span className="text-gray-400">Please enter a 5-letter word as your guess.</span>;
       } else {
-        const result = wordGuessGame.processGuess(command, gameWord, gameAttempts + 1, gameMaxAttempts);
+        const result = wordGuessGame.processGuess(
+          command, 
+          gameWord, 
+          gameCategory,
+          gameAttempts + 1, 
+          gameMaxAttempts,
+          gameGuessedLetters,
+          showGameHint
+        );
         
         if (result.isValid) {
           setGameAttempts(prev => prev + 1);
@@ -976,10 +1049,35 @@ function HelpSection() {
         
         if (result.isCorrect || (result.isValid && gameAttempts + 1 >= gameMaxAttempts)) {
           setIsPlayingGame(false);
+          // Reset hint state for next game
+          setShowGameHint(false);
         }
         
         output = result.output;
       }
+      
+      setHistory(prev => [...prev, { command: cmd, output }]);
+      setCurrentCommand('');
+      
+      // Ensure terminal scrolls to bottom after adding output
+      setTimeout(() => {
+        if (terminalRef.current) {
+          terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+        }
+      }, 50);
+      return;
+    } else if (isPlayingGame && command === 'hint') {
+      // Display hint for the game
+      setShowGameHint(true);
+      output = (
+        <div className="space-y-2">
+          <div className="text-blue-400">{wordGuessGame.getHint(gameCategory)}</div>
+          {formatAlphabet(gameGuessedLetters, gameWord)}
+          <div className="text-gray-400">
+            You have {gameMaxAttempts - gameAttempts} {gameMaxAttempts - gameAttempts === 1 ? 'attempt' : 'attempts'} left.
+          </div>
+        </div>
+      );
       
       setHistory(prev => [...prev, { command: cmd, output }]);
       setCurrentCommand('');
@@ -1116,9 +1214,12 @@ function HelpSection() {
         break;
       case 'game':
         // Initialize the word-guess game
-        const newWord = wordGuessGame.getRandomWord();
-        setGameWord(newWord);
+        const randomWordData = wordGuessGame.getRandomWord();
+        setGameWord(randomWordData.word);
+        setGameCategory(randomWordData.category);
         setGameAttempts(0);
+        setGameGuessedLetters(new Set());
+        setShowGameHint(false);
         setIsPlayingGame(true);
         output = (
           <div className="space-y-2">
@@ -1136,8 +1237,14 @@ function HelpSection() {
               <br />
               <span className="text-gray-500">Gray</span> = letter not in the word
             </div>
+            <div className="text-gray-400 mt-2">
+              Letters in the word will appear <span className="text-blue-400 font-bold">blue</span> in the alphabet below.
+              <br />
+              Letters not in the word will appear <span className="text-red-400 font-bold">red</span>.
+            </div>
+            {formatAlphabet(new Set(), randomWordData.word)}
             <div className="text-gray-400 italic mt-2">
-              (Type 'exit' to quit the game)
+              Type 'hint' for a category hint, or 'exit' to quit.
             </div>
           </div>
         );
@@ -1177,6 +1284,43 @@ function HelpSection() {
     }
     
     setCurrentCommand('');
+  };
+
+  // Format the alphabet display for the game
+  const formatAlphabet = (guessedLetters: Set<string>, targetWord: string) => {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    
+    return (
+      <div className="mt-3 mb-1">
+        <div className="text-gray-400 mb-1">Letters used:</div>
+        <div className="flex flex-wrap">
+          {alphabet.split('').map(letter => {
+            if (!guessedLetters.has(letter)) {
+              // Not guessed yet
+              return (
+                <span key={letter} className="inline-flex justify-center items-center w-6 h-6 text-gray-400 border border-gray-700 rounded m-0.5">
+                  {letter}
+                </span>
+              );
+            } else if (targetWord.includes(letter)) {
+              // Guessed and in word
+              return (
+                <span key={letter} className="inline-flex justify-center items-center w-6 h-6 text-blue-400 font-bold border border-blue-700 bg-blue-900 bg-opacity-30 rounded m-0.5">
+                  {letter}
+                </span>
+              );
+            } else {
+              // Guessed but not in word
+              return (
+                <span key={letter} className="inline-flex justify-center items-center w-6 h-6 text-red-400 font-bold border border-red-700 bg-red-900 bg-opacity-30 rounded m-0.5">
+                  {letter}
+                </span>
+              );
+            }
+          })}
+        </div>
+      </div>
+    );
   };
 
   const allContentSection = (
