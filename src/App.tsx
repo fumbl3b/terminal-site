@@ -762,7 +762,7 @@ function App() {
   const [guestbookTotalPages, setGuestbookTotalPages] = useState(1);
   
   // API URL - in production, use environment variable
-  const API_URL = import.meta.env.VITE_BACKEND_URL || 'https://guestbook-orpin.vercel.app'; // Replace with your actual Vercel deployment URL
+  const API_URL = (import.meta.env.VITE_BACKEND_URL || 'https://guestbook-orpin.vercel.app').replace(/\/+$/, ''); // Remove trailing slashes
   
   // Track API requests for rate limiting
   const [apiRequestCount, setApiRequestCount] = useState(0);
@@ -807,11 +807,19 @@ function App() {
     return { rateLimited: false };
   }, [apiRequestCount, apiRateLimitResetTime]);
 
+  // Helper to ensure we don't get double slashes in URLs
+  const buildApiUrl = useCallback((path: string) => {
+    // Remove trailing slash from base URL and leading slash from path to join correctly
+    const base = API_URL.replace(/\/+$/, '');
+    const cleanPath = path.replace(/^\/+/, '');
+    return `${base}/${cleanPath}`;
+  }, [API_URL]);
+
   // Test CORS configuration
   const testCorsSetup = useCallback(async () => {
     try {
       // Simple preflight check
-      const response = await fetch(`${API_URL}/health`, {
+      const response = await fetch(buildApiUrl('health'), {
         method: 'OPTIONS',
         mode: 'cors',
         credentials: 'omit',
@@ -823,7 +831,7 @@ function App() {
       console.error('CORS test failed:', error);
       return false;
     }
-  }, [API_URL]);
+  }, [API_URL, buildApiUrl]);
 
   // Check API health
   const checkApiHealth = useCallback(async () => {
@@ -841,7 +849,7 @@ function App() {
         console.warn('CORS test failed, API may not be accessible from this domain');
       }
       
-      const response = await fetch(`${API_URL}/health`, {
+      const response = await fetch(buildApiUrl('health'), {
         method: 'GET',
         mode: 'cors',
         credentials: 'omit',
@@ -877,7 +885,7 @@ function App() {
         throw new Error('API service is currently unavailable. Please try again later.');
       }
       
-      const response = await fetch(`${API_URL}/api/entries?page=${page}&limit=${limit}`, {
+      const response = await fetch(buildApiUrl(`api/entries?page=${page}&limit=${limit}`), {
         method: 'GET',
         mode: 'cors',
         credentials: 'omit',
@@ -909,10 +917,10 @@ function App() {
     } finally {
       setGuestbookLoading(false);
     }
-  }, [API_URL, checkApiHealth, checkRateLimit]);
+  }, [API_URL, checkApiHealth, checkRateLimit, buildApiUrl]);
   
   // Function to submit a new guestbook entry
-  const submitGuestbookEntry = async (name: string, message: string) => {
+  const submitGuestbookEntry = useCallback(async (name: string, message: string) => {
     setGuestbookLoading(true);
     setGuestbookError('');
     try {
@@ -937,7 +945,7 @@ function App() {
         throw new Error('Message is required and must be between 1-500 characters');
       }
       
-      const response = await fetch(`${API_URL}/api/entries`, {
+      const response = await fetch(buildApiUrl('api/entries'), {
         method: 'POST',
         mode: 'cors',
         credentials: 'omit',
@@ -970,7 +978,7 @@ function App() {
     } finally {
       setGuestbookLoading(false);
     }
-  };
+  }, [checkRateLimit, checkApiHealth, buildApiUrl, fetchGuestbookEntries]);
 
   const aboutSection = (
     <Section title="About Me">
@@ -1637,7 +1645,9 @@ function HelpSection() {
                 
                 <div className="bg-gray-900 p-3 rounded-md">
                   <div>API URL: <span className="text-yellow-400">{displayUrl}</span></div>
-                  <div className="mt-2">
+                  <div>Health Check URL: <span className="text-gray-400">{buildApiUrl('health')}</span></div>
+                  <div>API Entries URL: <span className="text-gray-400">{buildApiUrl('api/entries')}</span></div>
+                  <div className="mt-3">
                     CORS Test: {corsOk ? 
                       <span className="text-green-500">✓ Working</span> : 
                       <span className="text-red-500">✗ Failed - CORS issue detected</span>}
