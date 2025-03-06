@@ -901,18 +901,56 @@ function App() {
       const data = await response.json();
       console.log('Raw API response:', data);
       
+      // Ensure entries have required fields for display
+      const validateEntry = (entry: any): entry is GuestbookEntry => {
+        return entry && 
+               typeof entry === 'object' && 
+               'id' in entry && 
+               'name' in entry && 
+               'message' in entry;
+      };
+      
+      // Process and validate entries
+      let validEntries: GuestbookEntry[] = [];
+      
       // Ensure we have valid entries array
       if (data && Array.isArray(data.entries)) {
-        setGuestbookEntries(data.entries);
+        // Filter only valid entries
+        validEntries = data.entries
+          .filter(validateEntry)
+          .map(entry => ({
+            ...entry,
+            // Ensure date exists, fallback to current date if missing
+            date: entry.date || new Date().toISOString().split('T')[0]
+          }));
+        
+        setGuestbookEntries(validEntries);
       } else if (data && typeof data === 'object' && 'entries' in data) {
         // Handle case where entries might not be an array but exists
         const entries = data.entries || [];
-        setGuestbookEntries(Array.isArray(entries) ? entries : []);
-        console.warn('Entries not in expected format:', data.entries);
+        const processedEntries = Array.isArray(entries) 
+          ? entries
+            .filter(validateEntry)
+            .map(entry => ({
+              ...entry,
+              date: entry.date || new Date().toISOString().split('T')[0]
+            }))
+          : [];
+        
+        validEntries = processedEntries;
+        setGuestbookEntries(processedEntries);
+        console.warn('Entries format processed:', processedEntries);
       } else {
         // For any other unexpected format, check if data itself is an array
         if (Array.isArray(data)) {
-          setGuestbookEntries(data);
+          validEntries = data
+            .filter(validateEntry)
+            .map(entry => ({
+              ...entry,
+              date: entry.date || new Date().toISOString().split('T')[0]
+            }));
+            
+          setGuestbookEntries(validEntries);
           console.warn('API returned entries as top-level array');
         } else {
           setGuestbookEntries([]);
@@ -924,7 +962,8 @@ function App() {
       setGuestbookTotalPages(data?.totalPages || 1);
       setGuestbookPage(data?.currentPage || 1);
       
-      return data;
+      // Return both the raw data and the processed entries
+      return { raw: data, entries: validEntries };
     } catch (error) {
       console.error('Error fetching guestbook entries:', error);
       
@@ -1786,34 +1825,107 @@ function HelpSection() {
         // Fetch entries asynchronously
         (async () => {
           try {
-            // Fetch entries and store the response
-            const entriesData = await fetchGuestbookEntries(1);
+            // Create local entries variable to use directly in rendering
+            let localEntries: GuestbookEntry[] = [];
             
-            // Log for debugging
-            console.log('Guestbook API response:', entriesData);
-            
-            // Double-check if we have entries in state
-            if (guestbookEntries.length === 0 && entriesData) {
-              // Attempt different access patterns in case the API response structure is unexpected
-              let extractedEntries = [];
+            try {
+              // Force loading state to be true
+              setGuestbookLoading(true);
               
-              // Check various patterns for entries
-              if (Array.isArray(entriesData)) {
-                // Maybe the entries are at the top level
-                extractedEntries = entriesData;
-              } else if (entriesData.data && Array.isArray(entriesData.data)) {
-                // Maybe entries are in a data field
-                extractedEntries = entriesData.data;
-              } else if (entriesData.results && Array.isArray(entriesData.results)) {
-                // Maybe entries are in a results field
-                extractedEntries = entriesData.results;
+              // Fetch entries and store the response directly in local variable
+              const entriesData = await fetchGuestbookEntries(1);
+              
+              // Log for debugging
+              console.log('Guestbook API response:', entriesData);
+              
+              // WORKAROUND: Direct extraction of entries from response
+              if (entriesData && typeof entriesData === 'object') {
+                // First try to access the structured response format
+                if (entriesData.entries && Array.isArray(entriesData.entries)) {
+                  localEntries = entriesData.entries;
+                  console.log('Populated localEntries from response.entries:', localEntries.length);
+                } 
+                // Then try other common patterns
+                else if (entriesData.raw && entriesData.raw.entries && Array.isArray(entriesData.raw.entries)) {
+                  localEntries = entriesData.raw.entries;
+                  console.log('Populated localEntries from response.raw.entries:', localEntries.length);
+                }
+                // If all else fails, look for any array structure that could be entries
+                else {
+                  let possibleEntries = null;
+                  
+                  // Recursively search for an array of objects with id, name, and message properties
+                  const findEntries = (obj: any, depth = 0): any[] | null => {
+                    if (depth > 3) return null; // Limit recursion depth
+                    
+                    if (Array.isArray(obj) && obj.length > 0 && 
+                        obj[0] && typeof obj[0] === 'object' && 
+                        'id' in obj[0] && 'name' in obj[0] && 'message' in obj[0]) {
+                      return obj;
+                    }
+                    
+                    if (obj && typeof obj === 'object') {
+                      for (const key in obj) {
+                        const result = findEntries(obj[key], depth + 1);
+                        if (result) return result;
+                      }
+                    }
+                    
+                    return null;
+                  };
+                  
+                  possibleEntries = findEntries(entriesData);
+                  
+                  if (possibleEntries) {
+                    localEntries = possibleEntries;
+                    console.log('Found entries through deep search:', localEntries.length);
+                  }
+                }
+                
+                // If we found entries, update state too
+                if (localEntries.length > 0) {
+                  setGuestbookEntries(localEntries);
+                }
               }
               
-              // If we found entries in an alternative location, use them
-              if (extractedEntries.length > 0) {
-                console.log('Found entries in alternative location:', extractedEntries);
-                setGuestbookEntries(extractedEntries);
+              // First check if entries were properly set in state by the fetchGuestbookEntries function
+              if (guestbookEntries && guestbookEntries.length > 0) {
+                console.log('Using entries from state:', guestbookEntries);
+                localEntries = [...guestbookEntries];
               }
+              // If no entries in state, try to extract them from the response directly
+              else if (entriesData) {
+                // Check if entries exist in the response in the expected format
+                if (entriesData.entries && Array.isArray(entriesData.entries) && entriesData.entries.length > 0) {
+                  console.log('Using entries directly from response:', entriesData.entries);
+                  localEntries = entriesData.entries;
+                  // Also update state for future reference
+                  setGuestbookEntries(entriesData.entries);
+                }
+                // Attempt different access patterns if not found in the expected location
+                else {
+                  // Check various patterns for entries
+                  if (Array.isArray(entriesData)) {
+                    // Maybe the entries are at the top level
+                    localEntries = entriesData;
+                  } else if (entriesData.data && Array.isArray(entriesData.data)) {
+                    // Maybe entries are in a data field
+                    localEntries = entriesData.data;
+                  } else if (entriesData.results && Array.isArray(entriesData.results)) {
+                    // Maybe entries are in a results field
+                    localEntries = entriesData.results;
+                  }
+                  
+                  // If we found entries in an alternative location, use them
+                  if (localEntries.length > 0) {
+                    console.log('Found entries in alternative location:', localEntries);
+                    // Also update state for future reference
+                    setGuestbookEntries(localEntries);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('Error extracting entries data:', error);
             }
             
             // Create full output with fetched entries
@@ -1821,17 +1933,26 @@ function HelpSection() {
               <div className="space-y-4">
                 <div className="text-green-400 font-bold text-lg mb-2">📖 Guestbook</div>
                 
-                {guestbookLoading ? (
+                {guestbookLoading && !localEntries.length ? (
                   <div className="text-gray-400 flex items-center">
                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                     Loading guestbook entries...
                   </div>
-                ) : guestbookError ? (
+                ) : guestbookError && !localEntries.length ? (
                   <div className="text-red-400">{guestbookError}</div>
-                ) : guestbookEntries.length === 0 ? (
+                ) : localEntries.length === 0 ? (
                   <div className="text-gray-400">
-                    <div>No entries found.</div>
-                    <div className="mt-1 text-sm">(API response: {JSON.stringify(entriesData || {}).slice(0, 100)}...)</div>
+                    <div>No entries found in rendered component.</div>
+                    {/* Debug info to help diagnose the issue */}
+                    <div className="mt-2 text-sm">Debug Info:</div>
+                    <div className="text-xs space-y-1 mt-1">
+                      <div>localEntries length: {localEntries?.length || 0}</div>
+                      <div>guestbookEntries length: {guestbookEntries?.length || 0}</div>
+                      <div>API response valid: {entriesData ? 'Yes' : 'No'}</div>
+                      {entriesData?.raw?.entries ? (
+                        <div>Raw entries count: {Array.isArray(entriesData.raw.entries) ? entriesData.raw.entries.length : 'Not an array'}</div>
+                      ) : null}
+                    </div>
                     <button 
                       onClick={() => {
                         // Set sample entries for testing when API fails
@@ -1849,7 +1970,48 @@ function HelpSection() {
                             date: new Date().toISOString().split('T')[0]
                           }
                         ];
+                        // Set both local entries and state entries
+                        localEntries = [...sampleEntries];
                         setGuestbookEntries(sampleEntries);
+                        
+                        // Force rerender by updating history
+                        setHistory(prev => {
+                          const latestIndex = prev.findIndex(
+                            item => item.command === 'guestbook' && 
+                            typeof item.output === 'object' && 
+                            item.output !== null
+                          );
+                          
+                          if (latestIndex !== -1) {
+                            // Clone the history
+                            const newHistory = [...prev];
+                            // Replace with success message
+                            newHistory[latestIndex] = { 
+                              command: 'guestbook', 
+                              output: (
+                                <div className="space-y-4">
+                                  <div className="text-green-400 font-bold text-lg mb-2">📖 Guestbook</div>
+                                  <div className="space-y-3">
+                                    {sampleEntries.map(entry => (
+                                      <div key={entry.id} className="bg-gray-900 bg-opacity-50 p-3 rounded-md">
+                                        <div className="flex justify-between">
+                                          <span className="text-yellow-400 font-medium">{entry.name}</span>
+                                          <span className="text-gray-500 text-sm">{entry.date}</span>
+                                        </div>
+                                        <div className="text-gray-300 mt-1">{entry.message}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="text-gray-400 mt-2">
+                                    Type <span className="text-green-400">sign guestbook</span> to add your own message.
+                                  </div>
+                                </div>
+                              )
+                            };
+                            return newHistory;
+                          }
+                          return prev;
+                        });
                       }}
                       className="mt-3 px-3 py-1 rounded bg-gray-800 text-green-400 hover:bg-gray-700 text-sm"
                     >
@@ -1858,7 +2020,7 @@ function HelpSection() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {guestbookEntries.map(entry => (
+                    {localEntries.map(entry => (
                       <div key={entry.id} className="bg-gray-900 bg-opacity-50 p-3 rounded-md">
                         <div className="flex justify-between">
                           <span className="text-yellow-400 font-medium">{entry.name}</span>
