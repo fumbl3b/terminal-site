@@ -761,7 +761,7 @@ function App() {
   const [guestbookTotalPages, setGuestbookTotalPages] = useState(1);
   
   // API URL - in production, use environment variable
-  const API_URL = 'https://your-guestbook-api.vercel.app'; // Replace with your actual API URL
+  const API_URL = 'https://guestbook-git-main-harry-winklers-projects.vercel.app/'; // Replace with your actual API URL
   
   // Function to fetch guestbook entries
   const fetchGuestbookEntries = useCallback(async (page = 1, limit = 10) => {
