@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Terminal, Github, Linkedin, Mail, ChevronRight, Download, RefreshCw } from 'lucide-react';
-import hljs from 'highlight.js';
-import 'highlight.js/styles/atom-one-dark.css';
 
 type Command = {
   command: string;
   output: React.ReactNode;
   isTyping?: boolean;
   pendingComponent?: React.ReactNode;
+  id?: string; // Add ID field to help with tracking commands
 };
 
 const AVAILABLE_COMMANDS = [
@@ -51,7 +50,7 @@ function TypewriterText({
   return <span className={className}>{displayedText}</span>;
 }
 
-// Component for typing multiline code with syntax highlighting
+// Component for typing multiline code
 function CodeTypewriter({ 
   code, 
   speed = 1, 
@@ -61,19 +60,16 @@ function CodeTypewriter({
   speed?: number; 
   onComplete: () => void 
 }) {
+  const hasCompletedRef = useRef(false);
   const [lines, setLines] = useState<string[]>([]);
   const [currentLine, setCurrentLine] = useState(0);
   const [currentChar, setCurrentChar] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
-  const [highlightedCode, setHighlightedCode] = useState<string>('');
+  const codeRef = useRef<HTMLPreElement>(null);
   
   // Split code into lines on component mount
   useEffect(() => {
     setLines(code.split('\n'));
-    
-    // Highlight the full code for reference
-    const highlighted = hljs.highlight(code, { language: 'javascript' }).value;
-    setHighlightedCode(highlighted);
   }, [code]);
   
   // Typing effect
@@ -100,35 +96,61 @@ function CodeTypewriter({
     } else if (!isComplete) {
       // All lines complete
       setIsComplete(true);
-      // Wait a moment before completing
-      setTimeout(() => {
-        onComplete();
-      }, 500);
+      
+      // Ensure we only call onComplete once
+      if (!hasCompletedRef.current) {
+        hasCompletedRef.current = true;
+        // Wait a moment before completing
+        setTimeout(() => {
+          onComplete();
+        }, 500);
+      }
     }
   }, [lines, currentLine, currentChar, speed, isComplete, onComplete]);
   
-  // Generate current visible code with highlighting
-  const getCurrentHighlightedCode = () => {
-    // Combine all completed lines and current partial line
-    const completedLines = lines.slice(0, currentLine);
-    const currentPartialLine = currentLine < lines.length ? lines[currentLine].substring(0, currentChar) : '';
+  // Auto-scroll as new content is typed
+  useEffect(() => {
+    if (codeRef.current) {
+      codeRef.current.scrollTop = codeRef.current.scrollHeight;
+    }
     
-    const visibleCode = [...completedLines, currentPartialLine].join('\n');
+    // Also scroll the terminal itself
+    const scrollTerminal = () => {
+      const terminalElement = document.querySelector('.terminal-container');
+      if (terminalElement) {
+        terminalElement.scrollTop = terminalElement.scrollHeight;
+      }
+    };
     
-    // Highlight the current visible code
-    if (visibleCode.trim() === '') return '';
-    return hljs.highlight(visibleCode, { language: 'javascript' }).value;
-  };
+    scrollTerminal();
+  }, [currentLine, currentChar]);
   
-  // Render typed code with syntax highlighting
+  // Cleanup effect - ensure onComplete gets called if component unmounts
+  useEffect(() => {
+    return () => {
+      if (!hasCompletedRef.current && lines.length > 0) {
+        hasCompletedRef.current = true;
+        onComplete();
+        console.log('CodeTypewriter cleanup: calling onComplete');
+      }
+    };
+  }, [onComplete, lines.length]);
+  
+  // Render typed code
   return (
-    <pre className="bg-[#282c34] rounded p-4 text-sm font-mono overflow-x-auto border border-gray-700">
-      <code 
-        className="hljs language-javascript" 
-        dangerouslySetInnerHTML={{ __html: getCurrentHighlightedCode() }} 
-      />
+    <pre 
+      ref={codeRef}
+      className="bg-black rounded p-4 text-sm text-green-400 font-mono max-h-[60vh] overflow-y-auto whitespace-pre-wrap [scrollbar-width:none] hover:[scrollbar-width:auto]"
+      style={{msOverflowStyle: "none"}}
+    >
+      {lines.slice(0, currentLine).map((line, i) => (
+        <div key={i} className="break-all">{line}</div>
+      ))}
       {currentLine < lines.length && (
-        <span className="animate-pulse text-white">▌</span>
+        <div className="break-all">
+          {lines[currentLine].substring(0, currentChar)}
+          <span className="animate-pulse text-green-400">▌</span>
+        </div>
       )}
     </pre>
   );
@@ -190,11 +212,63 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // Always scroll to bottom when history changes or a command is being typed
   useEffect(() => {
-    if (terminalRef.current) {
-      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
-    }
-  }, [history]);
+    const scrollToBottom = () => {
+      if (terminalRef.current) {
+        terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+      }
+    };
+    
+    // Scroll immediately and also after a slight delay to handle rendering time
+    scrollToBottom();
+    const timer1 = setTimeout(scrollToBottom, 50);
+    const timer2 = setTimeout(scrollToBottom, 500); // Additional delay for larger components
+    
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }, [history, currentCommand]);
+  
+  // Additional scroll listener to keep at bottom unless user scrolls up
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    if (!terminal) return;
+    
+    let userHasScrolled = false;
+    
+    const handleScroll = () => {
+      if (!terminal) return;
+      
+      // If user scrolls up, mark as scrolled
+      if (terminal.scrollTop < terminal.scrollHeight - terminal.clientHeight - 50) {
+        userHasScrolled = true;
+      }
+      
+      // If user scrolls to bottom, reset flag
+      if (terminal.scrollHeight - terminal.scrollTop - terminal.clientHeight < 10) {
+        userHasScrolled = false;
+      }
+    };
+    
+    // Force scroll to bottom on changes, unless user has scrolled up
+    const forceScrollToBottom = () => {
+      if (!userHasScrolled && terminal) {
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+    };
+    
+    terminal.addEventListener('scroll', handleScroll);
+    
+    // Set up interval to check and scroll if needed
+    const scrollInterval = setInterval(forceScrollToBottom, 500);
+    
+    return () => {
+      terminal.removeEventListener('scroll', handleScroll);
+      clearInterval(scrollInterval);
+    };
+  }, []);
 
   const handleTabCompletion = (input: string) => {
     const matchingCommands = AVAILABLE_COMMANDS.filter(cmd => 
@@ -227,7 +301,8 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
   return (
     <div 
       ref={terminalRef}
-      className="bg-black text-green-400 p-4 rounded-md overflow-y-auto h-[calc(100vh-2rem)] max-h-[800px] w-full max-w-4xl mx-auto"
+      className="terminal-container bg-black text-green-400 p-4 rounded-md overflow-y-auto h-[calc(100vh-2rem)] max-h-[800px] w-full max-w-4xl mx-auto [scrollbar-width:none] hover:[scrollbar-width:auto]"
+      style={{msOverflowStyle: "none"}}
       onClick={() => inputRef.current?.focus()}
     >
       {history.map((entry, i) => (
@@ -705,6 +780,13 @@ function DownloadSection() {
       
       setHistory(prev => [...prev, { command: cmd, output }]);
       setCurrentCommand('');
+      
+      // Ensure terminal scrolls to bottom after adding output
+      setTimeout(() => {
+        if (terminalRef.current) {
+          terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+        }
+      }, 50);
       return;
     }
 
@@ -716,26 +798,66 @@ function DownloadSection() {
       }
 
       // First add the code typing animation
-      setHistory(prev => [...prev, { 
-        command: cmd, 
+      const randomId = `cmd-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      const newCommand = { 
+        command: cmd,
+        id: randomId, // Add a unique ID to find this command later
         output: <CodeTypewriter code={code} onComplete={() => {
           // When typing completes, replace the entry with the actual component
           setHistory(prev => {
-            // Find the index of the command we just added
+            // Find the index of the command we just added using its unique ID
             const index = prev.findIndex(entry => 
-              entry.command === cmd && entry.output && typeof entry.output !== 'string'
+              entry.id === randomId && entry.command === cmd
             );
             
             if (index !== -1) {
               // Create a new history array with the updated entry
               const newHistory = [...prev];
-              newHistory[index] = { command: cmd, output: component };
+              newHistory[index] = { command: cmd, id: randomId, output: component };
+              
+              // Log successful replacement
+              console.log(`Successfully replaced typed code with component for command: ${cmd}`);
+              
               return newHistory;
+            } else {
+              // Log error if not found
+              console.warn(`Could not find command to replace: ${cmd} with ID ${randomId}`);
+              return prev;
             }
-            return prev;
           });
+          
+          // Ensure terminal scrolls to bottom after component rendering
+          setTimeout(() => {
+            if (terminalRef.current) {
+              terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+            }
+          }, 50);
         }} />
-      }]);
+      };
+      
+      // Add a fallback timer in case the onComplete event never triggers
+      const fallbackTimer = setTimeout(() => {
+        setHistory(prev => {
+          const index = prev.findIndex(entry => entry.id === randomId);
+          if (index !== -1 && prev[index].output && typeof prev[index].output !== 'string') {
+            // If we find the entry and it still has CodeTypewriter output
+            console.log(`Fallback replacement for ${cmd} with ID ${randomId}`);
+            const newHistory = [...prev];
+            newHistory[index] = { command: cmd, id: randomId, output: component };
+            return newHistory;
+          }
+          return prev;
+        });
+      }, 10000); // 10-second fallback
+      
+      setHistory(prev => [...prev, newCommand]);
+      
+      // Ensure terminal scrolls to bottom when code typing starts
+      setTimeout(() => {
+        if (terminalRef.current) {
+          terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+        }
+      }, 50);
 
       setCurrentCommand('');
       // Return null since we're handling the output directly
@@ -814,6 +936,13 @@ function DownloadSection() {
     // Only add to history if we have output to show and we haven't already handled it
     if (output !== null && command !== '') {
       setHistory(prev => [...prev, { command: cmd, output }]);
+      
+      // Ensure terminal scrolls to bottom after adding output
+      setTimeout(() => {
+        if (terminalRef.current) {
+          terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+        }
+      }, 50);
     }
     
     setCurrentCommand('');
