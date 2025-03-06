@@ -9,6 +9,13 @@ type Command = {
   id?: string; // Add ID field to help with tracking commands
 };
 
+type GuestbookEntry = {
+  id: string;
+  name: string;
+  message: string;
+  date: string;
+};
+
 const AVAILABLE_COMMANDS = [
   'about',
   'projects',
@@ -20,7 +27,9 @@ const AVAILABLE_COMMANDS = [
   'clear',
   'help',
   'chat',
-  'matrix'
+  'matrix',
+  'guestbook',
+  'sign guestbook'
 ];
 
 function TypewriterText({ 
@@ -739,6 +748,74 @@ function App() {
   const [gameGuessedLetters, setGameGuessedLetters] = useState<Set<string>>(new Set());
   const [showGameHint, setShowGameHint] = useState(false);
   const wordGuessGame = WordGuessGame();
+  
+  // Guestbook state
+  const [isSigningGuestbook, setIsSigningGuestbook] = useState(false);
+  const [guestbookStep, setGuestbookStep] = useState<'name' | 'message' | 'complete'>('name');
+  const [guestbookName, setGuestbookName] = useState('');
+  const [guestbookMessage, setGuestbookMessage] = useState('');
+  const [guestbookEntries, setGuestbookEntries] = useState<GuestbookEntry[]>([]);
+  const [guestbookLoading, setGuestbookLoading] = useState(false);
+  const [guestbookError, setGuestbookError] = useState('');
+  const [guestbookPage, setGuestbookPage] = useState(1);
+  const [guestbookTotalPages, setGuestbookTotalPages] = useState(1);
+  
+  // API URL - in production, use environment variable
+  const API_URL = 'https://your-guestbook-api.vercel.app'; // Replace with your actual API URL
+  
+  // Function to fetch guestbook entries
+  const fetchGuestbookEntries = useCallback(async (page = 1, limit = 10) => {
+    setGuestbookLoading(true);
+    setGuestbookError('');
+    try {
+      const response = await fetch(`${API_URL}/api/entries?page=${page}&limit=${limit}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch guestbook entries');
+      }
+      
+      const data = await response.json();
+      setGuestbookEntries(data.entries || []);
+      setGuestbookTotalPages(data.totalPages || 1);
+      setGuestbookPage(data.currentPage || 1);
+      return data;
+    } catch (error) {
+      console.error('Error fetching guestbook entries:', error);
+      setGuestbookError('Failed to load entries. Please try again later.');
+      return null;
+    } finally {
+      setGuestbookLoading(false);
+    }
+  }, [API_URL]);
+  
+  // Function to submit a new guestbook entry
+  const submitGuestbookEntry = async (name: string, message: string) => {
+    setGuestbookLoading(true);
+    setGuestbookError('');
+    try {
+      const response = await fetch(`${API_URL}/api/entries`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name, message })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit entry');
+      }
+      
+      // Refresh entries to include the new one
+      await fetchGuestbookEntries(1);
+      return true;
+    } catch (error) {
+      console.error('Error submitting guestbook entry:', error);
+      setGuestbookError(error instanceof Error ? error.message : 'Failed to submit entry');
+      return false;
+    } finally {
+      setGuestbookLoading(false);
+    }
+  };
 
   const aboutSection = (
     <Section title="About Me">
@@ -858,8 +935,10 @@ function App() {
         <li>contact - Display contact information</li>
         <li>download - Download my resume</li>
         <li>chat - Open `harryAi`</li>
-        <li>matrix - hmmmm? </li>
+        <li>matrix - Display Matrix-style animation (close with ✕)</li>
         <li>game - Play a word guessing game</li>
+        <li>guestbook - View visitor messages</li>
+        <li>sign guestbook - Leave your own message</li>
         <li>clear - Clear the terminal</li>
         <li>help - Show this help message</li>
       </ul>
@@ -1013,6 +1092,8 @@ function HelpSection() {
         <li>chat - Open \`harryAi\`</li>
         <li>matrix - Display Matrix-style animation (close with ✕)</li>
         <li>game - Play a word guessing game</li>
+        <li>guestbook - View visitor messages</li>
+        <li>sign guestbook - Leave your own message</li>
         <li>clear - Clear the terminal</li>
         <li>help - Show this help message</li>
       </ul>
@@ -1028,6 +1109,120 @@ function HelpSection() {
     const command = cmd.trim().toLowerCase();
     let output: React.ReactNode;
 
+    // Handle guestbook signing process
+    if (isSigningGuestbook) {
+      if (command.toLowerCase() === 'exit') {
+        setIsSigningGuestbook(false);
+        output = <span className="text-yellow-400">Guestbook signing cancelled.</span>;
+      } else if (guestbookStep === 'name') {
+        // Process name input
+        if (command.trim() === '') {
+          output = <span className="text-red-400">Please enter your name.</span>;
+        } else {
+          // Save name and move to message step
+          setGuestbookName(command);
+          setGuestbookStep('message');
+          output = (
+            <div className="space-y-2">
+              <div className="text-green-400">
+                Step 2: Thanks, {command}! Now please enter your message.
+              </div>
+              <div className="text-gray-400 italic">
+                (Type 'exit' to cancel)
+              </div>
+            </div>
+          );
+        }
+      } else if (guestbookStep === 'message') {
+        // Process message input
+        if (command.trim() === '') {
+          output = <span className="text-red-400">Please enter a message.</span>;
+        } else {
+          // Save message and complete the process
+          setGuestbookMessage(command);
+          setGuestbookStep('complete');
+          
+          // Show loading state
+          output = (
+            <div className="space-y-2">
+              <div className="text-gray-400">
+                Submitting your guestbook entry...
+              </div>
+            </div>
+          );
+          
+          // Add command/output to history first for immediate feedback
+          setHistory(prev => [...prev, { command: cmd, output }]);
+          setCurrentCommand('');
+          
+          // Submit to API asynchronously
+          submitGuestbookEntry(guestbookName, command).then(success => {
+            // Reset signing state whether successful or not
+            setIsSigningGuestbook(false);
+            
+            if (success) {
+              // Show success message (will appear as a new entry in history)
+              const successOutput = (
+                <div className="space-y-2">
+                  <div className="text-green-400">
+                    ✅ Thank you for signing the guestbook!
+                  </div>
+                  <div className="bg-gray-900 bg-opacity-50 p-3 rounded-md">
+                    <div className="flex justify-between">
+                      <span className="text-yellow-400 font-medium">{guestbookName}</span>
+                      <span className="text-gray-500 text-sm">{new Date().toISOString().split('T')[0]}</span>
+                    </div>
+                    <div className="text-gray-300 mt-1">{command}</div>
+                  </div>
+                  <div className="text-gray-400 mt-2">
+                    Type <span className="text-green-400">guestbook</span> to view all entries.
+                  </div>
+                </div>
+              );
+              
+              // Add this as a new entry in the terminal
+              setHistory(prev => [...prev, { 
+                command: 'Entry submitted', 
+                output: successOutput 
+              }]);
+            } else {
+              // Show error message
+              const errorOutput = (
+                <div className="space-y-2">
+                  <div className="text-red-400">
+                    ❌ There was a problem submitting your entry: {guestbookError}
+                  </div>
+                  <div className="text-gray-400 mt-2">
+                    Please try again later.
+                  </div>
+                </div>
+              );
+              
+              // Add this as a new entry in the terminal
+              setHistory(prev => [...prev, { 
+                command: 'Error', 
+                output: errorOutput 
+              }]);
+            }
+          });
+          
+          // Return immediately since we've already handled adding to history
+          return;
+        }
+      }
+      
+      setHistory(prev => [...prev, { command: cmd, output }]);
+      setCurrentCommand('');
+      
+      // Ensure terminal scrolls to bottom after adding output
+      setTimeout(() => {
+        if (terminalRef.current) {
+          terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+        }
+      }, 50);
+      return;
+    }
+    
     // Handle guesses for the word-guess game
     if (isPlayingGame && !['exit', 'hint'].includes(command)) {
       if (command === '') {
@@ -1259,6 +1454,92 @@ function HelpSection() {
         break;
       case 'help':
         output = processComponentCommand(helpText, 'help');
+        break;
+      case 'guestbook':
+        // Fetch and display guestbook entries
+        fetchGuestbookEntries(1);
+        
+        output = (
+          <div className="space-y-4">
+            <div className="text-green-400 font-bold text-lg mb-2">📖 Guestbook</div>
+            
+            {guestbookLoading ? (
+              <div className="text-gray-400">Loading guestbook entries...</div>
+            ) : guestbookError ? (
+              <div className="text-red-400">{guestbookError}</div>
+            ) : guestbookEntries.length === 0 ? (
+              <div className="text-gray-400">No entries yet. Be the first to sign!</div>
+            ) : (
+              <div className="space-y-3">
+                {guestbookEntries.map(entry => (
+                  <div key={entry.id} className="bg-gray-900 bg-opacity-50 p-3 rounded-md">
+                    <div className="flex justify-between">
+                      <span className="text-yellow-400 font-medium">{entry.name}</span>
+                      <span className="text-gray-500 text-sm">{entry.date}</span>
+                    </div>
+                    <div className="text-gray-300 mt-1">{entry.message}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {guestbookTotalPages > 1 && (
+              <div className="flex justify-between items-center mt-4">
+                <button 
+                  onClick={() => {
+                    if (guestbookPage > 1) {
+                      fetchGuestbookEntries(guestbookPage - 1);
+                    }
+                  }}
+                  className={`px-3 py-1 rounded ${guestbookPage > 1 
+                    ? 'bg-gray-800 text-green-400 hover:bg-gray-700' 
+                    : 'bg-gray-900 text-gray-600 cursor-not-allowed'}`}
+                  disabled={guestbookPage <= 1}
+                >
+                  Previous
+                </button>
+                <span className="text-gray-400">
+                  Page {guestbookPage} of {guestbookTotalPages}
+                </span>
+                <button 
+                  onClick={() => {
+                    if (guestbookPage < guestbookTotalPages) {
+                      fetchGuestbookEntries(guestbookPage + 1);
+                    }
+                  }}
+                  className={`px-3 py-1 rounded ${guestbookPage < guestbookTotalPages 
+                    ? 'bg-gray-800 text-green-400 hover:bg-gray-700' 
+                    : 'bg-gray-900 text-gray-600 cursor-not-allowed'}`}
+                  disabled={guestbookPage >= guestbookTotalPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+            
+            <div className="text-gray-400 mt-2">
+              Type <span className="text-green-400">sign guestbook</span> to add your own message.
+            </div>
+          </div>
+        );
+        break;
+      case 'sign guestbook':
+        // Start the guestbook signing process
+        setIsSigningGuestbook(true);
+        setGuestbookStep('name');
+        setGuestbookName('');
+        setGuestbookMessage('');
+        output = (
+          <div className="space-y-2">
+            <div className="text-green-400 font-bold">✍️ Sign the Guestbook</div>
+            <div className="text-gray-300">
+              Step 1: Please enter your name.
+            </div>
+            <div className="text-gray-400 italic mt-2">
+              (Type 'exit' to cancel)
+            </div>
+          </div>
+        );
         break;
       case 'clear':
         setHistory([]);
