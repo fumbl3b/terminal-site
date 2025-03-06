@@ -29,7 +29,8 @@ const AVAILABLE_COMMANDS = [
   'chat',
   'matrix',
   'guestbook',
-  'sign guestbook'
+  'sign guestbook',
+  'api-status'
 ];
 
 function TypewriterText({ 
@@ -806,6 +807,24 @@ function App() {
     return { rateLimited: false };
   }, [apiRequestCount, apiRateLimitResetTime]);
 
+  // Test CORS configuration
+  const testCorsSetup = useCallback(async () => {
+    try {
+      // Simple preflight check
+      const response = await fetch(`${API_URL}/health`, {
+        method: 'OPTIONS',
+        mode: 'cors',
+        credentials: 'omit',
+      });
+      
+      // Return success if options request worked
+      return response.ok || response.status === 204;
+    } catch (error) {
+      console.error('CORS test failed:', error);
+      return false;
+    }
+  }, [API_URL]);
+
   // Check API health
   const checkApiHealth = useCallback(async () => {
     try {
@@ -816,7 +835,20 @@ function App() {
         return false;
       }
       
-      const response = await fetch(`${API_URL}/health`);
+      // Test CORS first if issues
+      const corsOk = await testCorsSetup();
+      if (!corsOk) {
+        console.warn('CORS test failed, API may not be accessible from this domain');
+      }
+      
+      const response = await fetch(`${API_URL}/health`, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
       if (!response.ok) {
         return false;
       }
@@ -826,7 +858,7 @@ function App() {
       console.error('API health check failed:', error);
       return false;
     }
-  }, [API_URL, checkRateLimit]);
+  }, [API_URL, checkRateLimit, testCorsSetup]);
   
   // Function to fetch guestbook entries
   const fetchGuestbookEntries = useCallback(async (page = 1, limit = 20) => {
@@ -845,7 +877,14 @@ function App() {
         throw new Error('API service is currently unavailable. Please try again later.');
       }
       
-      const response = await fetch(`${API_URL}/api/entries?page=${page}&limit=${limit}`);
+      const response = await fetch(`${API_URL}/api/entries?page=${page}&limit=${limit}`, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || errorData.details || 'Failed to fetch guestbook entries');
@@ -858,7 +897,14 @@ function App() {
       return data;
     } catch (error) {
       console.error('Error fetching guestbook entries:', error);
-      setGuestbookError(error instanceof Error ? error.message : 'Failed to load entries. Please try again later.');
+      
+      // Special handling for CORS errors
+      if (error instanceof TypeError && error.message.includes('NetworkError') || 
+          error instanceof DOMException && error.name === 'NetworkError') {
+        setGuestbookError('Network error: CORS issue detected. The API server may not allow requests from this domain.');
+      } else {
+        setGuestbookError(error instanceof Error ? error.message : 'Failed to load entries. Please try again later.');
+      }
       return null;
     } finally {
       setGuestbookLoading(false);
@@ -893,8 +939,11 @@ function App() {
       
       const response = await fetch(`${API_URL}/api/entries`, {
         method: 'POST',
+        mode: 'cors',
+        credentials: 'omit',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify({ name, message })
       });
@@ -909,7 +958,14 @@ function App() {
       return true;
     } catch (error) {
       console.error('Error submitting guestbook entry:', error);
-      setGuestbookError(error instanceof Error ? error.message : 'Failed to submit entry');
+      
+      // Special handling for CORS errors
+      if (error instanceof TypeError && error.message.includes('NetworkError') || 
+          error instanceof DOMException && error.name === 'NetworkError') {
+        setGuestbookError('Network error: CORS issue detected. The API server may not allow requests from this domain.');
+      } else {
+        setGuestbookError(error instanceof Error ? error.message : 'Failed to submit entry');
+      }
       return false;
     } finally {
       setGuestbookLoading(false);
@@ -1038,6 +1094,7 @@ function App() {
         <li>game - Play a word guessing game</li>
         <li>guestbook - View visitor messages</li>
         <li>sign guestbook - Leave your own message</li>
+        <li>api-status - Check guestbook API connectivity</li>
         <li>clear - Clear the terminal</li>
         <li>help - Show this help message</li>
       </ul>
@@ -1554,6 +1611,72 @@ function HelpSection() {
       case 'help':
         output = processComponentCommand(helpText, 'help');
         break;
+      case 'api-status':
+        setGuestbookLoading(true);
+        output = <div className="text-gray-400">Testing API connection...</div>;
+        
+        // Add this command/output to history first for immediate feedback
+        setHistory(prev => [...prev, { command: cmd, output }]);
+        setCurrentCommand('');
+        
+        // Test API connection asynchonously
+        (async () => {
+          try {
+            // Test CORS first
+            const corsOk = await testCorsSetup();
+            
+            // Then test API health
+            const apiOk = await checkApiHealth();
+            
+            // Get API URL for display
+            const displayUrl = API_URL.replace(/\/$/, '');
+            
+            const statusOutput = (
+              <div className="space-y-2">
+                <div className="text-lg text-green-400">API Status Check</div>
+                
+                <div className="bg-gray-900 p-3 rounded-md">
+                  <div>API URL: <span className="text-yellow-400">{displayUrl}</span></div>
+                  <div className="mt-2">
+                    CORS Test: {corsOk ? 
+                      <span className="text-green-500">✓ Working</span> : 
+                      <span className="text-red-500">✗ Failed - CORS issue detected</span>}
+                  </div>
+                  <div className="mt-1">
+                    Health Check: {apiOk ? 
+                      <span className="text-green-500">✓ API is healthy</span> : 
+                      <span className="text-red-500">✗ API health check failed</span>}
+                  </div>
+                  
+                  <div className="mt-3 text-gray-400 text-sm">
+                    {corsOk && apiOk ? 
+                      'The guestbook API is properly configured and available.' : 
+                      'There are issues connecting to the guestbook API. The backend may not be available or there may be CORS configuration issues.'}
+                  </div>
+                </div>
+              </div>
+            );
+            
+            // Add this as a new entry in the terminal
+            setHistory(prev => [...prev, { 
+              command: 'API Status Results', 
+              output: statusOutput 
+            }]);
+          } catch (error) {
+            console.error('API status test error:', error);
+            
+            // Show error message
+            setHistory(prev => [...prev, { 
+              command: 'API Status Error', 
+              output: <div className="text-red-400">Error testing API: {error instanceof Error ? error.message : 'Unknown error'}</div>
+            }]);
+          } finally {
+            setGuestbookLoading(false);
+          }
+        })();
+        
+        // Return immediately since we've already handled adding to history
+        return;
       case 'guestbook':
         // Fetch and display guestbook entries
         fetchGuestbookEntries(1);
