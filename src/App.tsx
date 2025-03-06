@@ -488,7 +488,7 @@ function ChatFrame({ onClose }: { onClose: () => void }) {
   return (
     <div className="relative bg-gray-900 rounded-md w-full h-[calc(100vh-8rem)] max-h-[600px] overflow-hidden">
       <div className="flex justify-between items-center bg-gray-800 p-2 rounded-t-md">
-        <div className="text-green-400 font-bold">Harry's AI Chat</div>
+        <div className="text-green-400 font-bold">harryAi</div>
         <button 
           onClick={onClose} 
           className="text-gray-400 hover:text-white px-2 py-1 rounded"
@@ -640,9 +640,6 @@ function App() {
         <li>clear - Clear the terminal</li>
         <li>help - Show this help message</li>
       </ul>
-      <div className="mt-3 text-gray-400 italic">
-        Note: All commands will show the React component code being typed before rendering
-      </div>
     </div>
   );
 
@@ -775,6 +772,27 @@ function DownloadSection() {
         Download Resume
       </a>
     </Section>
+  );
+}`,
+      help: `
+// Help Section Component
+function HelpSection() {
+  return (
+    <div className="text-gray-300">
+      Available commands:
+      <ul className="list-disc list-inside mt-2 ml-4">
+        <li>about - Display information about me</li>
+        <li>projects - Show featured projects</li>
+        <li>skills - List technical skills</li>
+        <li>experience - Show work experience</li>
+        <li>contact - Display contact information</li>
+        <li>download - Download my resume</li>
+        <li>chat - Open \`harryAi\`</li>
+        <li>game - Play a word guessing game</li>
+        <li>clear - Clear the terminal</li>
+        <li>help - Show this help message</li>
+      </ul>
+    </div>
   );
 }`
     };
@@ -959,7 +977,7 @@ function DownloadSection() {
         }
         break;
       case 'help':
-        output = helpText;
+        output = processComponentCommand(helpText, 'help');
         break;
       case 'clear':
         setHistory([]);
@@ -1017,7 +1035,7 @@ function DownloadSection() {
             <div className="flex items-center mb-8 w-full max-w-4xl mx-auto">
               <Terminal className="w-6 h-6 mr-2" />
               <TypewriterText 
-                text="Welcome to Harry's Portfolio Terminal. Type 'help' for available commands." 
+                text="Welcome to fumblebee.site. Type 'help' for available commands." 
                 onComplete={() => setShowWelcome(false)}
               />
             </div>
