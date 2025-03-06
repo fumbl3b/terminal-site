@@ -18,7 +18,8 @@ const AVAILABLE_COMMANDS = [
   'download',
   'game',
   'clear',
-  'help'
+  'help',
+  'chat'
 ];
 
 function TypewriterText({ 
@@ -480,6 +481,30 @@ function WordGuessGame() {
   return { getRandomWord, processGuess };
 }
 
+function ChatFrame({ onClose }: { onClose: () => void }) {
+  const isDev = import.meta.env.DEV;
+  const chatUrl = isDev ? 'http://localhost:3000' : 'https://harry-ai.vercel.app/';
+
+  return (
+    <div className="relative bg-gray-900 rounded-md w-full h-[calc(100vh-8rem)] max-h-[600px] overflow-hidden">
+      <div className="flex justify-between items-center bg-gray-800 p-2 rounded-t-md">
+        <div className="text-green-400 font-bold">Harry's AI Chat</div>
+        <button 
+          onClick={onClose} 
+          className="text-gray-400 hover:text-white px-2 py-1 rounded"
+        >
+          ✕ Close
+        </button>
+      </div>
+      <iframe 
+        src={chatUrl} 
+        className="w-full h-[calc(100%-2.5rem)]" 
+        title="harryAi"
+      />
+    </div>
+  );
+}
+
 function App() {
   const [history, setHistory] = useState<Command[]>([]);
   const [currentCommand, setCurrentCommand] = useState('');
@@ -610,6 +635,7 @@ function App() {
         <li>experience - Show work experience</li>
         <li>contact - Display contact information</li>
         <li>download - Download my resume</li>
+        <li>chat - Open `harryAi`</li>
         <li>game - Play a word guessing game</li>
         <li>clear - Clear the terminal</li>
         <li>help - Show this help message</li>
@@ -882,6 +908,19 @@ function DownloadSection() {
         break;
       case 'download':
         output = processComponentCommand(downloadSection, 'download');
+        break;
+      case 'chat':
+        // Add a chat command that opens an iframe
+        output = (
+          <ChatFrame 
+            onClose={() => {
+              // Remove the chat frame from history when closed
+              setHistory(prev => prev.filter(entry => 
+                !(entry.command === 'chat' && entry.output && typeof entry.output !== 'string')
+              ));
+            }} 
+          />
+        );
         break;
       case 'game':
         // Initialize the word-guess game
