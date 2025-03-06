@@ -761,16 +761,94 @@ function App() {
   const [guestbookTotalPages, setGuestbookTotalPages] = useState(1);
   
   // API URL - in production, use environment variable
-  const API_URL = 'https://guestbook-git-main-harry-winklers-projects.vercel.app/'; // Replace with your actual API URL
+  const API_URL = import.meta.env.VITE_BACKEND_URL || 'https://your-api-domain.vercel.app'; // Replace with your actual Vercel deployment URL
+  
+  // Track API requests for rate limiting
+  const [apiRequestCount, setApiRequestCount] = useState(0);
+  const [apiRateLimitResetTime, setApiRateLimitResetTime] = useState<Date | null>(null);
+  
+  // Reset rate limit counter every minute
+  useEffect(() => {
+    const resetRateLimit = () => {
+      setApiRequestCount(0);
+      setApiRateLimitResetTime(new Date(Date.now() + 60000)); // 1 minute from now
+    };
+    
+    // Set initial reset time
+    resetRateLimit();
+    
+    // Reset counter every minute
+    const interval = setInterval(resetRateLimit, 60000);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Function to check if we're rate limited
+  const checkRateLimit = useCallback(() => {
+    // API allows 50 requests per minute per IP
+    const MAX_REQUESTS_PER_MINUTE = 50;
+    
+    if (apiRequestCount >= MAX_REQUESTS_PER_MINUTE) {
+      const now = new Date();
+      const resetTime = apiRateLimitResetTime;
+      if (resetTime && resetTime > now) {
+        // Still rate limited
+        const secondsToWait = Math.ceil((resetTime.getTime() - now.getTime()) / 1000);
+        return {
+          rateLimited: true,
+          message: `Rate limit exceeded. Please try again in ${secondsToWait} seconds.`
+        };
+      }
+    }
+    
+    // Not rate limited, increment counter
+    setApiRequestCount(count => count + 1);
+    return { rateLimited: false };
+  }, [apiRequestCount, apiRateLimitResetTime]);
+
+  // Check API health
+  const checkApiHealth = useCallback(async () => {
+    try {
+      // Check rate limit first
+      const rateLimitCheck = checkRateLimit();
+      if (rateLimitCheck.rateLimited) {
+        console.warn('Rate limit reached:', rateLimitCheck.message);
+        return false;
+      }
+      
+      const response = await fetch(`${API_URL}/health`);
+      if (!response.ok) {
+        return false;
+      }
+      const data = await response.json();
+      return data.status === 'OK' && data.database === 'connected';
+    } catch (error) {
+      console.error('API health check failed:', error);
+      return false;
+    }
+  }, [API_URL, checkRateLimit]);
   
   // Function to fetch guestbook entries
-  const fetchGuestbookEntries = useCallback(async (page = 1, limit = 10) => {
+  const fetchGuestbookEntries = useCallback(async (page = 1, limit = 20) => {
     setGuestbookLoading(true);
     setGuestbookError('');
     try {
+      // Check rate limit first
+      const rateLimitCheck = checkRateLimit();
+      if (rateLimitCheck.rateLimited) {
+        throw new Error(rateLimitCheck.message);
+      }
+      
+      // Check API health
+      const isHealthy = await checkApiHealth();
+      if (!isHealthy) {
+        throw new Error('API service is currently unavailable. Please try again later.');
+      }
+      
       const response = await fetch(`${API_URL}/api/entries?page=${page}&limit=${limit}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch guestbook entries');
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.details || 'Failed to fetch guestbook entries');
       }
       
       const data = await response.json();
@@ -780,18 +858,39 @@ function App() {
       return data;
     } catch (error) {
       console.error('Error fetching guestbook entries:', error);
-      setGuestbookError('Failed to load entries. Please try again later.');
+      setGuestbookError(error instanceof Error ? error.message : 'Failed to load entries. Please try again later.');
       return null;
     } finally {
       setGuestbookLoading(false);
     }
-  }, [API_URL]);
+  }, [API_URL, checkApiHealth, checkRateLimit]);
   
   // Function to submit a new guestbook entry
   const submitGuestbookEntry = async (name: string, message: string) => {
     setGuestbookLoading(true);
     setGuestbookError('');
     try {
+      // Check rate limit first
+      const rateLimitCheck = checkRateLimit();
+      if (rateLimitCheck.rateLimited) {
+        throw new Error(rateLimitCheck.message);
+      }
+      
+      // Check API health
+      const isHealthy = await checkApiHealth();
+      if (!isHealthy) {
+        throw new Error('API service is currently unavailable. Please try again later.');
+      }
+
+      // Validate according to API requirements
+      if (!name || name.length > 50) {
+        throw new Error('Name is required and must be between 1-50 characters');
+      }
+      
+      if (!message || message.length > 500) {
+        throw new Error('Message is required and must be between 1-500 characters');
+      }
+      
       const response = await fetch(`${API_URL}/api/entries`, {
         method: 'POST',
         headers: {
@@ -802,7 +901,7 @@ function App() {
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to submit entry');
+        throw new Error(errorData.error || errorData.details || 'Failed to submit entry');
       }
       
       // Refresh entries to include the new one
