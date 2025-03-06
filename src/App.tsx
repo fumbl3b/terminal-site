@@ -1320,41 +1320,98 @@ function HelpSection() {
           setCurrentCommand('');
           
           // Submit to API asynchronously
-          submitGuestbookEntry(guestbookName, command).then(success => {
-            // Reset signing state whether successful or not
-            setIsSigningGuestbook(false);
-            
-            if (success) {
-              // Show success message (will appear as a new entry in history)
-              const successOutput = (
-                <div className="space-y-2">
-                  <div className="text-green-400">
-                    ✅ Thank you for signing the guestbook!
-                  </div>
-                  <div className="bg-gray-900 bg-opacity-50 p-3 rounded-md">
-                    <div className="flex justify-between">
-                      <span className="text-yellow-400 font-medium">{guestbookName}</span>
-                      <span className="text-gray-500 text-sm">{new Date().toISOString().split('T')[0]}</span>
-                    </div>
-                    <div className="text-gray-300 mt-1">{command}</div>
-                  </div>
-                  <div className="text-gray-400 mt-2">
-                    Type <span className="text-green-400">guestbook</span> to view all entries.
-                  </div>
-                </div>
-              );
+          (async () => {
+            try {
+              const success = await submitGuestbookEntry(guestbookName, command);
               
-              // Add this as a new entry in the terminal
-              setHistory(prev => [...prev, { 
-                command: 'Entry submitted', 
-                output: successOutput 
-              }]);
-            } else {
+              // Reset signing state whether successful or not
+              setIsSigningGuestbook(false);
+              
+              if (success) {
+                // Show success message (will appear as a new entry in history)
+                const successOutput = (
+                  <div className="space-y-2">
+                    <div className="text-green-400">
+                      ✅ Thank you for signing the guestbook!
+                    </div>
+                    <div className="bg-gray-900 bg-opacity-50 p-3 rounded-md">
+                      <div className="flex justify-between">
+                        <span className="text-yellow-400 font-medium">{guestbookName}</span>
+                        <span className="text-gray-500 text-sm">{new Date().toISOString().split('T')[0]}</span>
+                      </div>
+                      <div className="text-gray-300 mt-1">{command}</div>
+                    </div>
+                    <div className="text-gray-400 mt-2">
+                      Type <span className="text-green-400">guestbook</span> to view all entries.
+                    </div>
+                  </div>
+                );
+                
+                // Find the loading message entry and replace it
+                setHistory(prev => {
+                  const loadingEntryIndex = prev.findLastIndex(
+                    item => item.command === cmd && item.output && typeof item.output === 'object'
+                  );
+                  
+                  if (loadingEntryIndex !== -1) {
+                    const newHistory = [...prev];
+                    newHistory[loadingEntryIndex] = { 
+                      command: 'Entry submitted', 
+                      output: successOutput 
+                    };
+                    return newHistory;
+                  }
+                  
+                  // If we couldn't find it, just add as a new entry
+                  return [...prev, { 
+                    command: 'Entry submitted', 
+                    output: successOutput 
+                  }];
+                });
+              } else {
+                // Show error message
+                const errorOutput = (
+                  <div className="space-y-2">
+                    <div className="text-red-400">
+                      ❌ There was a problem submitting your entry: {guestbookError}
+                    </div>
+                    <div className="text-gray-400 mt-2">
+                      Please try again later.
+                    </div>
+                  </div>
+                );
+                
+                // Find the loading message entry and replace it with error
+                setHistory(prev => {
+                  const loadingEntryIndex = prev.findLastIndex(
+                    item => item.command === cmd && item.output && typeof item.output === 'object'
+                  );
+                  
+                  if (loadingEntryIndex !== -1) {
+                    const newHistory = [...prev];
+                    newHistory[loadingEntryIndex] = { 
+                      command: 'Error', 
+                      output: errorOutput 
+                    };
+                    return newHistory;
+                  }
+                  
+                  // If we couldn't find it, just add as a new entry
+                  return [...prev, { 
+                    command: 'Error', 
+                    output: errorOutput 
+                  }];
+                });
+              }
+            } catch (error) {
+              console.error('Unexpected error in submitGuestbookEntry:', error);
+              setIsSigningGuestbook(false);
+              
               // Show error message
               const errorOutput = (
                 <div className="space-y-2">
                   <div className="text-red-400">
-                    ❌ There was a problem submitting your entry: {guestbookError}
+                    ❌ Unexpected error: {error instanceof Error ? error.message : 'Unknown error'}
                   </div>
                   <div className="text-gray-400 mt-2">
                     Please try again later.
@@ -1362,13 +1419,13 @@ function HelpSection() {
                 </div>
               );
               
-              // Add this as a new entry in the terminal
+              // Add error message to history
               setHistory(prev => [...prev, { 
                 command: 'Error', 
                 output: errorOutput 
               }]);
             }
-          });
+          })();
           
           // Return immediately since we've already handled adding to history
           return;
@@ -1688,73 +1745,152 @@ function HelpSection() {
         // Return immediately since we've already handled adding to history
         return;
       case 'guestbook':
-        // Fetch and display guestbook entries
-        fetchGuestbookEntries(1);
-        
+        // Show loading state immediately
+        setGuestbookLoading(true);
         output = (
           <div className="space-y-4">
             <div className="text-green-400 font-bold text-lg mb-2">📖 Guestbook</div>
-            
-            {guestbookLoading ? (
-              <div className="text-gray-400">Loading guestbook entries...</div>
-            ) : guestbookError ? (
-              <div className="text-red-400">{guestbookError}</div>
-            ) : guestbookEntries.length === 0 ? (
-              <div className="text-gray-400">No entries yet. Be the first to sign!</div>
-            ) : (
-              <div className="space-y-3">
-                {guestbookEntries.map(entry => (
-                  <div key={entry.id} className="bg-gray-900 bg-opacity-50 p-3 rounded-md">
-                    <div className="flex justify-between">
-                      <span className="text-yellow-400 font-medium">{entry.name}</span>
-                      <span className="text-gray-500 text-sm">{entry.date}</span>
-                    </div>
-                    <div className="text-gray-300 mt-1">{entry.message}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            {guestbookTotalPages > 1 && (
-              <div className="flex justify-between items-center mt-4">
-                <button 
-                  onClick={() => {
-                    if (guestbookPage > 1) {
-                      fetchGuestbookEntries(guestbookPage - 1);
-                    }
-                  }}
-                  className={`px-3 py-1 rounded ${guestbookPage > 1 
-                    ? 'bg-gray-800 text-green-400 hover:bg-gray-700' 
-                    : 'bg-gray-900 text-gray-600 cursor-not-allowed'}`}
-                  disabled={guestbookPage <= 1}
-                >
-                  Previous
-                </button>
-                <span className="text-gray-400">
-                  Page {guestbookPage} of {guestbookTotalPages}
-                </span>
-                <button 
-                  onClick={() => {
-                    if (guestbookPage < guestbookTotalPages) {
-                      fetchGuestbookEntries(guestbookPage + 1);
-                    }
-                  }}
-                  className={`px-3 py-1 rounded ${guestbookPage < guestbookTotalPages 
-                    ? 'bg-gray-800 text-green-400 hover:bg-gray-700' 
-                    : 'bg-gray-900 text-gray-600 cursor-not-allowed'}`}
-                  disabled={guestbookPage >= guestbookTotalPages}
-                >
-                  Next
-                </button>
-              </div>
-            )}
-            
-            <div className="text-gray-400 mt-2">
-              Type <span className="text-green-400">sign guestbook</span> to add your own message.
+            <div className="text-gray-400 flex items-center">
+              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              Loading guestbook entries...
             </div>
           </div>
         );
-        break;
+        
+        // Add this initial loading state to history for immediate feedback
+        setHistory(prev => [...prev, { command: cmd, output }]);
+        setCurrentCommand('');
+        
+        // Fetch entries asynchronously
+        (async () => {
+          try {
+            // Fetch entries
+            await fetchGuestbookEntries(1);
+            
+            // Create full output with fetched entries
+            const entriesOutput = (
+              <div className="space-y-4">
+                <div className="text-green-400 font-bold text-lg mb-2">📖 Guestbook</div>
+                
+                {guestbookLoading ? (
+                  <div className="text-gray-400 flex items-center">
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Loading guestbook entries...
+                  </div>
+                ) : guestbookError ? (
+                  <div className="text-red-400">{guestbookError}</div>
+                ) : guestbookEntries.length === 0 ? (
+                  <div className="text-gray-400">No entries yet. Be the first to sign!</div>
+                ) : (
+                  <div className="space-y-3">
+                    {guestbookEntries.map(entry => (
+                      <div key={entry.id} className="bg-gray-900 bg-opacity-50 p-3 rounded-md">
+                        <div className="flex justify-between">
+                          <span className="text-yellow-400 font-medium">{entry.name}</span>
+                          <span className="text-gray-500 text-sm">{entry.date}</span>
+                        </div>
+                        <div className="text-gray-300 mt-1">{entry.message}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {guestbookTotalPages > 1 && (
+                  <div className="flex justify-between items-center mt-4">
+                    <button 
+                      onClick={async () => {
+                        if (guestbookPage > 1 && !guestbookLoading) {
+                          setGuestbookLoading(true);
+                          await fetchGuestbookEntries(guestbookPage - 1);
+                        }
+                      }}
+                      className={`px-3 py-1 rounded flex items-center ${guestbookPage > 1 && !guestbookLoading
+                        ? 'bg-gray-800 text-green-400 hover:bg-gray-700' 
+                        : 'bg-gray-900 text-gray-600 cursor-not-allowed'}`}
+                      disabled={guestbookPage <= 1 || guestbookLoading}
+                    >
+                      {guestbookLoading ? <RefreshCw className="w-3 h-3 mr-1 animate-spin" /> : null}
+                      Previous
+                    </button>
+                    <span className="text-gray-400">
+                      Page {guestbookPage} of {guestbookTotalPages}
+                    </span>
+                    <button 
+                      onClick={async () => {
+                        if (guestbookPage < guestbookTotalPages && !guestbookLoading) {
+                          setGuestbookLoading(true);
+                          await fetchGuestbookEntries(guestbookPage + 1);
+                        }
+                      }}
+                      className={`px-3 py-1 rounded flex items-center ${guestbookPage < guestbookTotalPages && !guestbookLoading
+                        ? 'bg-gray-800 text-green-400 hover:bg-gray-700' 
+                        : 'bg-gray-900 text-gray-600 cursor-not-allowed'}`}
+                      disabled={guestbookPage >= guestbookTotalPages || guestbookLoading}
+                    >
+                      {guestbookLoading ? <RefreshCw className="w-3 h-3 mr-1 animate-spin" /> : null}
+                      Next
+                    </button>
+                  </div>
+                )}
+                
+                <div className="text-gray-400 mt-2">
+                  Type <span className="text-green-400">sign guestbook</span> to add your own message.
+                </div>
+              </div>
+            );
+            
+            // Replace loading state with actual content
+            setHistory(prev => {
+              const latestIndex = prev.findIndex(
+                item => item.command === 'guestbook' && 
+                typeof item.output === 'object' && 
+                item.output !== null
+              );
+              
+              if (latestIndex !== -1) {
+                const updatedHistory = [...prev];
+                updatedHistory[latestIndex] = { 
+                  command: 'guestbook', 
+                  output: entriesOutput 
+                };
+                return updatedHistory;
+              }
+              
+              // If for some reason we can't find the entry, append a new one
+              return [...prev, { command: 'guestbook results', output: entriesOutput }];
+            });
+            
+          } catch (error) {
+            console.error('Error in guestbook command:', error);
+            
+            // Show error message
+            setHistory(prev => {
+              const latestIndex = prev.findLastIndex(
+                item => item.command === 'guestbook'
+              );
+              
+              if (latestIndex !== -1) {
+                const updatedHistory = [...prev];
+                updatedHistory[latestIndex] = { 
+                  command: 'guestbook', 
+                  output: <div className="text-red-400">Error loading guestbook: {error instanceof Error ? error.message : 'Unknown error'}</div>
+                };
+                return updatedHistory;
+              }
+              
+              return [...prev, { 
+                command: 'guestbook', 
+                output: <div className="text-red-400">Error loading guestbook: {error instanceof Error ? error.message : 'Unknown error'}</div>
+              }];
+            });
+          } finally {
+            // Ensure loading state is properly reset
+            setGuestbookLoading(false);
+          }
+        })();
+        
+        // Return immediately since we've already handled adding to history
+        return;
       case 'sign guestbook':
         // Start the guestbook signing process
         setIsSigningGuestbook(true);
