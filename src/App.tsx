@@ -899,9 +899,31 @@ function App() {
       }
       
       const data = await response.json();
-      setGuestbookEntries(data.entries || []);
-      setGuestbookTotalPages(data.totalPages || 1);
-      setGuestbookPage(data.currentPage || 1);
+      console.log('Raw API response:', data);
+      
+      // Ensure we have valid entries array
+      if (data && Array.isArray(data.entries)) {
+        setGuestbookEntries(data.entries);
+      } else if (data && typeof data === 'object' && 'entries' in data) {
+        // Handle case where entries might not be an array but exists
+        const entries = data.entries || [];
+        setGuestbookEntries(Array.isArray(entries) ? entries : []);
+        console.warn('Entries not in expected format:', data.entries);
+      } else {
+        // For any other unexpected format, check if data itself is an array
+        if (Array.isArray(data)) {
+          setGuestbookEntries(data);
+          console.warn('API returned entries as top-level array');
+        } else {
+          setGuestbookEntries([]);
+          console.warn('No valid entries found in response:', data);
+        }
+      }
+      
+      // Set pagination data with fallbacks
+      setGuestbookTotalPages(data?.totalPages || 1);
+      setGuestbookPage(data?.currentPage || 1);
+      
       return data;
     } catch (error) {
       console.error('Error fetching guestbook entries:', error);
@@ -1764,8 +1786,35 @@ function HelpSection() {
         // Fetch entries asynchronously
         (async () => {
           try {
-            // Fetch entries
-            await fetchGuestbookEntries(1);
+            // Fetch entries and store the response
+            const entriesData = await fetchGuestbookEntries(1);
+            
+            // Log for debugging
+            console.log('Guestbook API response:', entriesData);
+            
+            // Double-check if we have entries in state
+            if (guestbookEntries.length === 0 && entriesData) {
+              // Attempt different access patterns in case the API response structure is unexpected
+              let extractedEntries = [];
+              
+              // Check various patterns for entries
+              if (Array.isArray(entriesData)) {
+                // Maybe the entries are at the top level
+                extractedEntries = entriesData;
+              } else if (entriesData.data && Array.isArray(entriesData.data)) {
+                // Maybe entries are in a data field
+                extractedEntries = entriesData.data;
+              } else if (entriesData.results && Array.isArray(entriesData.results)) {
+                // Maybe entries are in a results field
+                extractedEntries = entriesData.results;
+              }
+              
+              // If we found entries in an alternative location, use them
+              if (extractedEntries.length > 0) {
+                console.log('Found entries in alternative location:', extractedEntries);
+                setGuestbookEntries(extractedEntries);
+              }
+            }
             
             // Create full output with fetched entries
             const entriesOutput = (
@@ -1780,7 +1829,33 @@ function HelpSection() {
                 ) : guestbookError ? (
                   <div className="text-red-400">{guestbookError}</div>
                 ) : guestbookEntries.length === 0 ? (
-                  <div className="text-gray-400">No entries yet. Be the first to sign!</div>
+                  <div className="text-gray-400">
+                    <div>No entries found.</div>
+                    <div className="mt-1 text-sm">(API response: {JSON.stringify(entriesData || {}).slice(0, 100)}...)</div>
+                    <button 
+                      onClick={() => {
+                        // Set sample entries for testing when API fails
+                        const sampleEntries = [
+                          {
+                            id: 'sample1',
+                            name: 'Sample User',
+                            message: 'This is a sample guestbook entry for testing.',
+                            date: new Date().toISOString().split('T')[0]
+                          },
+                          {
+                            id: 'sample2',
+                            name: 'Another Visitor',
+                            message: 'Thanks for the cool terminal portfolio!',
+                            date: new Date().toISOString().split('T')[0]
+                          }
+                        ];
+                        setGuestbookEntries(sampleEntries);
+                      }}
+                      className="mt-3 px-3 py-1 rounded bg-gray-800 text-green-400 hover:bg-gray-700 text-sm"
+                    >
+                      Load Sample Entries
+                    </button>
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     {guestbookEntries.map(entry => (
