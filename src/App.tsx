@@ -761,7 +761,7 @@ function App() {
   const [guestbookTotalPages, setGuestbookTotalPages] = useState(1);
   
   // API URL - in production, use environment variable
-  const API_URL = import.meta.env.VITE_BACKEND_URL || 'https://your-api-domain.vercel.app'; // Replace with your actual Vercel deployment URL
+  const API_URL = import.meta.env.VITE_BACKEND_URL || 'https://guestbook-orpin.vercel.app'; // Replace with your actual Vercel deployment URL
   
   // Track API requests for rate limiting
   const [apiRequestCount, setApiRequestCount] = useState(0);
