@@ -1,5 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Terminal, Github, Linkedin, Mail, ChevronRight, Download, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense, memo, useMemo } from 'react';
+import { Terminal, Github, Linkedin, Mail, ChevronRight, Download, RefreshCw, Volume2, VolumeX } from 'lucide-react';
+import { terminalSounds } from './sounds';
+
+// Lazy load heavy components
+const MatrixRain = lazy(() => import('./components/MatrixRain'));
+const ChatFrame = lazy(() => import('./components/ChatFrame'));
+const WordGuessGame = lazy(() => import('./components/WordGuessGame'));
 
 type Command = {
   command: string;
@@ -30,7 +36,13 @@ const AVAILABLE_COMMANDS = [
   'matrix',
   'guestbook',
   'sign guestbook',
-  'api-status'
+  'api-status',
+  'whoami',
+  'date',
+  'uptime',
+  'history',
+  'pwd',
+  'ls'
 ];
 
 function TypewriterText({ 
@@ -52,6 +64,7 @@ function TypewriterText({
       const timer = setTimeout(() => {
         setDisplayedText(prev => prev + text[currentIndex]);
         setCurrentIndex(currentIndex + 1);
+        // No sound for automated typing animations
       }, speed);
       return () => clearTimeout(timer);
     } else if (onComplete) {
@@ -95,6 +108,7 @@ function CodeTypewriter({
         // Still typing the current line
         const timer = setTimeout(() => {
           setCurrentChar(prev => prev + 1);
+          // No sound for automated code typing animations
         }, speed);
         return () => clearTimeout(timer);
       } else {
@@ -168,7 +182,7 @@ function CodeTypewriter({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+const Section = memo(({ title, children }: { title: string; children: React.ReactNode }) => {
   return (
     <div className="mb-8">
       <div className="flex items-center text-green-400 mb-2">
@@ -178,9 +192,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <div className="ml-6">{children}</div>
     </div>
   );
-}
+});
+Section.displayName = 'Section';
 
-function SkillCategory({ title, skills }: { title: string; skills: string[] }) {
+const SkillCategory = memo(({ title, skills }: { title: string; skills: string[] }) => {
   return (
     <div className="mb-4">
       <h3 className="text-green-400 mb-2"># {title}</h3>
@@ -191,7 +206,8 @@ function SkillCategory({ title, skills }: { title: string; skills: string[] }) {
       </div>
     </div>
   );
-}
+});
+SkillCategory.displayName = 'SkillCategory';
 
 function Experience({ company, role, period, location, responsibilities }: {
   company: string;
@@ -213,16 +229,20 @@ function Experience({ company, role, period, location, responsibilities }: {
   );
 }
 
-function TerminalInterface({ history, currentCommand, onCommandChange, onCommandSubmit }: {
+function TerminalInterface({ history, currentCommand, onCommandChange, onCommandSubmit, soundEnabled, onSoundToggle }: {
   history: Command[];
   currentCommand: string;
   onCommandChange: (cmd: string) => void;
   onCommandSubmit: (cmd: string) => void;
+  soundEnabled: boolean;
+  onSoundToggle: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [commandHistory, setCommandHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
 
   // Always scroll to bottom when history changes or a command is being typed
   useEffect(() => {
@@ -299,24 +319,80 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Handle Ctrl+L to clear terminal
+    if (e.ctrlKey && e.key === 'l') {
+      e.preventDefault();
+      onCommandSubmit('clear');
+      return;
+    }
+    
+    // Handle Ctrl+C to cancel current input
+    if (e.ctrlKey && e.key === 'c') {
+      e.preventDefault();
+      onCommandChange('');
+      setHistoryIndex(-1);
+      setShowSuggestions(false);
+      return;
+    }
+    
     if (e.key === 'Tab') {
       e.preventDefault();
+      terminalSounds.playTabKey();
       handleTabCompletion(currentCommand);
     } else if (e.key === 'Enter') {
+      terminalSounds.playEnterKey();
+      // Add command to history if it's not empty and not the same as the last command
+      if (currentCommand.trim() && 
+          (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== currentCommand.trim())) {
+        setCommandHistory(prev => [...prev, currentCommand.trim()]);
+      }
+      setHistoryIndex(-1);
       onCommandSubmit(currentCommand);
       setShowSuggestions(false);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (commandHistory.length > 0) {
+        const newIndex = historyIndex === -1 ? commandHistory.length - 1 : Math.max(0, historyIndex - 1);
+        setHistoryIndex(newIndex);
+        onCommandChange(commandHistory[newIndex]);
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (historyIndex >= 0) {
+        const newIndex = historyIndex + 1;
+        if (newIndex >= commandHistory.length) {
+          setHistoryIndex(-1);
+          onCommandChange('');
+        } else {
+          setHistoryIndex(newIndex);
+          onCommandChange(commandHistory[newIndex]);
+        }
+      }
     } else {
       setShowSuggestions(false);
+      // Reset history index when user starts typing
+      if (historyIndex !== -1 && e.key.length === 1) {
+        setHistoryIndex(-1);
+      }
     }
   };
 
-  return (
-    <div 
-      ref={terminalRef}
-      className="terminal-container bg-black text-green-400 p-4 rounded-md overflow-y-auto h-[calc(100vh-2rem)] max-h-[800px] w-full max-w-4xl mx-auto [scrollbar-width:none] hover:[scrollbar-width:auto]"
-      style={{msOverflowStyle: "none"}}
-      onClick={() => inputRef.current?.focus()}
-    >
+  return (<div className="relative">
+      {/* Sound toggle button */}
+      <button
+        onClick={onSoundToggle}
+        className="absolute top-2 right-2 z-10 p-2 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-green-400 transition-colors"
+        title={soundEnabled ? 'Disable sound effects' : 'Enable sound effects'}
+      >
+        {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+      </button>
+      
+      <div 
+        ref={terminalRef}
+        className="terminal-container bg-black text-green-400 p-4 rounded-md overflow-y-auto h-[calc(100vh-2rem)] max-h-[800px] w-full max-w-4xl mx-auto [scrollbar-width:none] hover:[scrollbar-width:auto]"
+        style={{msOverflowStyle: "none"}}
+        onClick={() => inputRef.current?.focus()}
+      >
       {history.map((entry, i) => (
         <div key={i} className="mb-4">
           <div className="flex items-center">
@@ -343,7 +419,30 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
             ref={inputRef}
             type="text"
             value={currentCommand}
-            onChange={(e) => onCommandChange(e.target.value)}
+            onChange={(e) => {
+              const newValue = e.target.value;
+              const oldValue = currentCommand;
+              onCommandChange(newValue);
+              
+              // Play typing sound when characters are added (not deleted)
+              if (newValue.length > oldValue.length) {
+                // Check if the last character added was a space
+                const lastChar = newValue.charAt(newValue.length - 1);
+                if (lastChar === ' ') {
+                  terminalSounds.playSpacebar();
+                } else {
+                  // Use alternating sounds for variety (every 3rd keystroke uses alt sound)
+                  if (newValue.length % 3 === 0) {
+                    terminalSounds.playKeyPressAlt();
+                  } else {
+                    terminalSounds.playKeyPress();
+                  }
+                }
+              } else if (newValue.length < oldValue.length) {
+                // Play backspace sound when characters are deleted
+                terminalSounds.playBackspace();
+              }
+            }}
             onKeyDown={handleKeyDown}
             className="ml-2 bg-transparent border-none outline-none flex-1 text-green-400 w-full md:w-auto"
             autoFocus
@@ -359,386 +458,42 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
         )}
       </div>
     </div>
-  );
+    </div>)
 }
 
-// WordGuessGame Component for CLI-style interface
-function WordGuessGame() {
-  // Organized word bank with categories
-  const wordCategories = {
-    'Common Objects': ['APPLE', 'CHAIR', 'FLAME', 'GRAPE', 'HOUSE', 'JUICE', 'KNIFE', 'LIGHT', 'MONEY', 'TABLE', 'WATER'],
-    'Animals': ['TIGER', 'PANDA', 'SHEEP', 'HORSE', 'SNAKE', 'EAGLE', 'ROBIN', 'WHALE', 'MOUSE', 'ZEBRA'],
-    'Colors': ['GREEN', 'WHITE', 'BLACK', 'BROWN', 'PEACH'],
-    'Food': ['PIZZA', 'SALAD', 'BREAD', 'STEAK', 'OLIVE', 'FRUIT', 'CANDY', 'PASTA', 'CREAM', 'DONUT'],
-    'Technology': ['PHONE', 'MOUSE', 'CLOUD', 'EMAIL', 'VIDEO', 'MEDIA', 'PHOTO', 'SOUND', 'POWER', 'ROBOT'],
-    'Places': ['BEACH', 'HOTEL', 'STORE', 'TOWER', 'PLAZA', 'FIELD', 'LAKE', 'HOUSE', 'CABIN', 'CLIFF'],
-    'Activities': ['DANCE', 'SMILE', 'PARTY', 'MUSIC', 'OCEAN', 'RIVER']
-  };
-  
-  // Flatten word bank for random selection
-  const flatWordBank = Object.values(wordCategories).flat();
-  
-  // Get a random word and its category
-  const getRandomWord = () => {
-    const randomIndex = Math.floor(Math.random() * flatWordBank.length);
-    const selectedWord = flatWordBank[randomIndex];
-    
-    // Find the category for this word
-    const category = Object.keys(wordCategories).find(cat => 
-      wordCategories[cat as keyof typeof wordCategories].includes(selectedWord)
-    ) || 'Unknown';
-    
-    return { word: selectedWord, category };
-  };
-  
-  // Get hint for the current word
-  const getHint = (category: string) => {
-    return `Hint: This word is in the category of "${category}".`;
-  };
-  
-  // Format the alphabet to show guessed letters
-  const formatAlphabet = (guessedLetters: Set<string>, targetWord: string) => {
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    
-    return (
-      <div className="mt-3 mb-1">
-        <div className="text-gray-400 mb-1">Letters used:</div>
-        <div className="flex flex-wrap">
-          {alphabet.split('').map(letter => {
-            if (!guessedLetters.has(letter)) {
-              // Not guessed yet
-              return (
-                <span key={letter} className="inline-flex justify-center items-center w-6 h-6 text-gray-400 border border-gray-700 rounded m-0.5">
-                  {letter}
-                </span>
-              );
-            } else if (targetWord.includes(letter)) {
-              // Guessed and in word
-              return (
-                <span key={letter} className="inline-flex justify-center items-center w-6 h-6 text-blue-400 font-bold border border-blue-700 bg-blue-900 bg-opacity-30 rounded m-0.5">
-                  {letter}
-                </span>
-              );
-            } else {
-              // Guessed but not in word
-              return (
-                <span key={letter} className="inline-flex justify-center items-center w-6 h-6 text-red-400 font-bold border border-red-700 bg-red-900 bg-opacity-30 rounded m-0.5">
-                  {letter}
-                </span>
-              );
-            }
-          })}
-        </div>
-      </div>
-    );
-  };
-  
-  // Format a guess with color indicators
-  const formatGuessOutput = (guess: string, targetWord: string) => {
-    const formattedLetters = guess.split('').map((letter, index) => {
-      if (letter === targetWord[index]) {
-        // Correct letter, correct position - green
-        return <span key={index} className="inline-flex justify-center items-center w-8 h-8 md:w-10 md:h-10 text-green-500 font-bold bg-green-900 bg-opacity-30 rounded m-0.5">{letter}</span>;
-      } else if (targetWord.includes(letter)) {
-        // Correct letter, wrong position - yellow
-        return <span key={index} className="inline-flex justify-center items-center w-8 h-8 md:w-10 md:h-10 text-yellow-500 font-bold bg-yellow-900 bg-opacity-30 rounded m-0.5">{letter}</span>;
-      } else {
-        // Wrong letter - gray
-        return <span key={index} className="inline-flex justify-center items-center w-8 h-8 md:w-10 md:h-10 text-gray-500 bg-gray-800 rounded m-0.5">{letter}</span>;
-      }
-    });
-    
-    return <div className="flex flex-wrap md:flex-nowrap">{formattedLetters}</div>;
-  };
-  
-  // Process a guess and return the formatted output
-  const processGuess = (
-    guess: string, 
-    targetWord: string, 
-    category: string,
-    attemptNum: number, 
-    maxAttempts: number,
-    guessedLetters: Set<string>,
-    showHint: boolean
-  ) => {
-    const upperGuess = guess.toUpperCase();
-    
-    // Track guessed letters
-    upperGuess.split('').forEach(letter => {
-      guessedLetters.add(letter);
-    });
-    
-    // Check if the guess is 5 letters
-    if (upperGuess.length !== 5) {
-      return {
-        output: (
-          <div className="space-y-2">
-            <span className="text-red-400">Your guess must be exactly 5 letters.</span>
-            {showHint && <div className="text-blue-400 mt-2">{getHint(category)}</div>}
-            {formatAlphabet(guessedLetters, targetWord)}
-          </div>
-        ),
-        isCorrect: false,
-        isValid: false
-      };
-    }
-    
-    // Process a valid guess
-    const formattedGuess = formatGuessOutput(upperGuess, targetWord);
-    const attemptsLeft = maxAttempts - attemptNum;
-    
-    if (upperGuess === targetWord) {
-      return {
-        output: (
-          <div className="space-y-2">
-            <div className="flex space-x-2">
-              <div>{formattedGuess}</div>
-              <span className="text-green-400 ml-2">Correct!</span>
-            </div>
-            <div className="text-green-400">
-              Congratulations! You guessed the word {targetWord} in {attemptNum} {attemptNum === 1 ? 'attempt' : 'attempts'}! 🎉
-            </div>
-            {formatAlphabet(guessedLetters, targetWord)}
-            <div className="text-gray-400 mt-2">
-              Type 'game' to play again.
-            </div>
-          </div>
-        ),
-        isCorrect: true,
-        isValid: true
-      };
-    } else if (attemptNum >= maxAttempts) {
-      return {
-        output: (
-          <div className="space-y-2">
-            <div className="flex space-x-2">
-              <div>{formattedGuess}</div>
-              <span className="text-red-400 ml-2">Wrong</span>
-            </div>
-            <div className="text-red-400">
-              Game over! You've used all your attempts. The word was {targetWord}.
-            </div>
-            {formatAlphabet(guessedLetters, targetWord)}
-            <div className="text-gray-400 mt-2">
-              Type 'game' to play again.
-            </div>
-          </div>
-        ),
-        isCorrect: false,
-        isValid: true
-      };
-    } else {
-      return {
-        output: (
-          <div className="space-y-2">
-            <div className="flex space-x-2">
-              <div>{formattedGuess}</div>
-              <span className="text-yellow-400 ml-2">Try again</span>
-            </div>
-            {showHint && <div className="text-blue-400 mt-2">{getHint(category)}</div>}
-            <div className="text-gray-400">
-              You have {attemptsLeft} {attemptsLeft === 1 ? 'attempt' : 'attempts'} left.
-            </div>
-            {formatAlphabet(guessedLetters, targetWord)}
-            <div className="text-gray-400 italic mt-2">
-              Type 'hint' for a hint about the word
-            </div>
-          </div>
-        ),
-        isCorrect: false,
-        isValid: true
-      };
-    }
-  };
-  
-  return { getRandomWord, processGuess, getHint };
-}
 
-function MatrixRain({ onClose }: { onClose: () => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isActive, setIsActive] = useState(true);
-  const initializedRef = useRef(false);
-  
-  // Array of Japanese katakana characters
-  const getRandomJapaneseChar = () => {
-    const japaneseChars = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ1234567890';
-    return japaneseChars.charAt(Math.floor(Math.random() * japaneseChars.length));
-  };
-
-  // Initialize the canvas once component mounts
-  useEffect(() => {
-    // Wait a brief moment before initializing to prevent immediate exit
-    const initTimeout = setTimeout(() => {
-      initializedRef.current = true;
-      
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-  
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-  
-      // Set canvas size to fill the container
-      const updateCanvasSize = () => {
-        if (canvas) {
-          canvas.width = window.innerWidth;
-          canvas.height = window.innerHeight;
-        }
-      };
-      updateCanvasSize();
-      
-      // Column and fontSize setup
-      const fontSize = 20;
-      const columns = Math.floor(canvas.width / fontSize);
-      
-      // Drops - one per column with varied speeds
-      const drops: number[] = Array(columns).fill(0).map(() => Math.floor(Math.random() * -canvas.height));
-      
-      // Speed factors - vary the fall speed for each column
-      const speedFactors: number[] = Array(columns).fill(0).map(() => {
-        // Random speed between 0.5 (slow) and 1.5 (fast)
-        return 0.5 + Math.random();
-      });
-      
-      // Track characters at each position
-      const chars: string[][] = Array(columns).fill(0).map(() => []);
-      
-      // Animation loop
-      let animationId: number;
-      const draw = () => {
-        if (!isActive) return;
-        
-        // Add slight transparency to create trailing effect
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        for (let i = 0; i < drops.length; i++) {
-          // Generate a new character for this column
-          if (drops[i] >= 0) {
-            const char = getRandomJapaneseChar();
-            chars[i].push(char);
-            if (chars[i].length > 25) { // Limit the trail length
-              chars[i].shift();
-            }
-          }
-          
-          // Draw the characters in this column with gradient effect
-          for (let j = 0; j < chars[i].length; j++) {
-            const yPos = drops[i] - (j * fontSize);
-            if (yPos < 0) continue;
-            
-            // Calculate opacity based on position in the trail
-            const opacity = 1 - (j / chars[i].length);
-            
-            // Lead character is bright green, trailing ones fade
-            ctx.fillStyle = j === 0 
-              ? '#0f0' // Bright green for the lead character
-              : `rgba(0, 255, 0, ${opacity})`; // Fading green for trailing characters
-            
-            ctx.font = `${fontSize}px monospace`;
-            ctx.fillText(chars[i][chars[i].length - 1 - j], i * fontSize, yPos);
-          }
-          
-          // Move drop with varied speeds
-          drops[i] += fontSize * speedFactors[i];
-          
-          // Reset drop when it reaches bottom with random offset
-          if (drops[i] > canvas.height && Math.random() > 0.975) {
-            drops[i] = -fontSize;
-            // Occasionally change speed when resetting
-            if (Math.random() > 0.7) {
-              speedFactors[i] = 0.5 + Math.random();
-            }
-          }
-        }
-        
-        animationId = requestAnimationFrame(draw);
-      };
-      
-      // Start animation
-      animationId = requestAnimationFrame(draw);
-      
-      // Handle window resize
-      const handleResize = () => {
-        updateCanvasSize();
-      };
-      window.addEventListener('resize', handleResize);
-      
-      // Clean up
-      return () => {
-        cancelAnimationFrame(animationId);
-        window.removeEventListener('resize', handleResize);
-      };
-    }, 300); // Wait 300ms before initializing
-    
-    return () => {
-      clearTimeout(initTimeout);
-    };
-  }, [onClose, isActive]);
-  
-  const handleClose = useCallback(() => {
-    if (!initializedRef.current) return;
-    
-    setIsActive(false);
-    onClose();
-  }, [onClose]);
-  
-  // Don't propagate clicks on the canvas to prevent accidental closing
-  const handleCanvasClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-  }, []);
-  
-  return (
-    <div 
-      ref={containerRef}
-      className="fixed inset-0 z-50 bg-black outline-none"
-    >
-      <canvas 
-        ref={canvasRef} 
-        className="w-full h-full"
-        onClick={handleCanvasClick}
-      />
-      
-      {/* Close button ('X') in top-right corner */}
-      <button
-        onClick={handleClose}
-        className="fixed top-4 right-4 bg-gray-800 text-white hover:bg-gray-700 w-10 h-10 rounded-full flex items-center justify-center shadow-lg"
-      >
-        ✕
-      </button>
-    </div>
-  );
-}
-
-function ChatFrame({ onClose }: { onClose: () => void }) {
-  const isDev = import.meta.env.DEV;
-  const chatUrl = isDev ? 'http://localhost:3000' : 'https://harry-ai.vercel.app/';
-
-  return (
-    <div className="relative bg-gray-900 rounded-md w-full h-[calc(100vh-8rem)] max-h-[600px] overflow-hidden">
-      <div className="flex justify-between items-center bg-gray-800 p-2 rounded-t-md">
-        <div className="text-green-400 font-bold">harryAi</div>
-        <button 
-          onClick={onClose} 
-          className="text-gray-400 hover:text-white px-2 py-1 rounded"
-        >
-          ✕ Close
-        </button>
-      </div>
-      <iframe 
-        src={chatUrl} 
-        className="w-full h-[calc(100%-2.5rem)]" 
-        title="harryAi"
-      />
-    </div>
-  );
-}
 
 function App() {
   const [history, setHistory] = useState<Command[]>([]);
   const [currentCommand, setCurrentCommand] = useState('');
   const [showWelcome, setShowWelcome] = useState(true);
   const [showAllContent, setShowAllContent] = useState(false);
+  const [appStartTime] = useState(Date.now());
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  
+  // Initialize sound system and load saved preference
+  useEffect(() => {
+    const savedSoundSetting = localStorage.getItem('terminal-sound-enabled') === 'true';
+    setSoundEnabled(savedSoundSetting);
+    if (savedSoundSetting) {
+      terminalSounds.enable();
+    }
+  }, []);
+  
+  // Toggle sound function
+  const toggleSound = useCallback(() => {
+    const newSoundState = !soundEnabled;
+    setSoundEnabled(newSoundState);
+    localStorage.setItem('terminal-sound-enabled', newSoundState.toString());
+    
+    if (newSoundState) {
+      terminalSounds.enable();
+      // Play a test sound
+      setTimeout(() => terminalSounds.playSuccess(), 100);
+    } else {
+      terminalSounds.disable();
+    }
+  }, [soundEnabled]);
   
   // Word guess game state
   const [isPlayingGame, setIsPlayingGame] = useState(false);
@@ -748,13 +503,21 @@ function App() {
   const [gameMaxAttempts] = useState(6);
   const [gameGuessedLetters, setGameGuessedLetters] = useState<Set<string>>(new Set());
   const [showGameHint, setShowGameHint] = useState(false);
-  const wordGuessGame = WordGuessGame();
+  const [wordGuessGameInstance, setWordGuessGameInstance] = useState<any>(null);
+  
+  // Initialize WordGuessGame lazily
+  useEffect(() => {
+    if (isPlayingGame && !wordGuessGameInstance) {
+      import('./components/WordGuessGame').then((gameModule) => {
+        setWordGuessGameInstance(gameModule.default());
+      });
+    }
+  }, [isPlayingGame, wordGuessGameInstance]);
   
   // Guestbook state
   const [isSigningGuestbook, setIsSigningGuestbook] = useState(false);
   const [guestbookStep, setGuestbookStep] = useState<'name' | 'message' | 'complete'>('name');
   const [guestbookName, setGuestbookName] = useState('');
-  const [guestbookMessage, setGuestbookMessage] = useState('');
   const [guestbookEntries, setGuestbookEntries] = useState<GuestbookEntry[]>([]);
   const [guestbookLoading, setGuestbookLoading] = useState(false);
   const [guestbookError, setGuestbookError] = useState('');
@@ -902,8 +665,9 @@ function App() {
       console.log('Raw API response:', data);
       
       // Ensure entries have required fields for display
-      const validateEntry = (entry: any): entry is GuestbookEntry => {
-        return entry && 
+      const validateEntry = (entry: unknown): entry is GuestbookEntry => {
+        return entry !== null &&
+               entry !== undefined &&
                typeof entry === 'object' && 
                'id' in entry && 
                'name' in entry && 
@@ -1041,7 +805,7 @@ function App() {
     }
   }, [checkRateLimit, checkApiHealth, buildApiUrl, fetchGuestbookEntries]);
 
-  const aboutSection = (
+  const aboutSection = useMemo(() => (
     <Section title="About Me">
       <p className="text-gray-300 leading-relaxed">
         Proficient Software Engineer versed in designing, developing, and maintaining both mobile and web applications. 
@@ -1050,9 +814,9 @@ function App() {
         integration tools, and agile software development methodologies.
       </p>
     </Section>
-  );
+  ), []);
 
-  const projectSection = (
+  const projectSection = useMemo(() => (
     <Section title="Featured Project">
       <div className="bg-gray-900 p-4 rounded-md mb-4">
         <h3 className="text-yellow-400 text-lg mb-2">Untitled Resume Tuner</h3>
@@ -1071,9 +835,9 @@ function App() {
         </a>
       </div>
     </Section>
-  );
+  ), []);
 
-  const skillsSection = (
+  const skillsSection = useMemo(() => (
     <Section title="Skills">
       <SkillCategory 
         title="Programming Languages" 
@@ -1088,9 +852,9 @@ function App() {
         skills={["AWS", "Docker", "Kubernetes", "PostgreSQL", "MongoDB", "Redis"]} 
       />
     </Section>
-  );
+  ), []);
 
-  const experienceSection = (
+  const experienceSection = useMemo(() => (
     <Section title="Experience">
       <Experience 
         company="JP Morgan Chase & Co"
@@ -1115,9 +879,9 @@ function App() {
         ]}
       />
     </Section>
-  );
+  ), []);
 
-  const contactSection = (
+  const contactSection = useMemo(() => (
     <Section title="Contact">
       <div className="flex flex-col space-y-2">
         <a href="mailto:harry@fumblebee.site" className="flex items-center text-gray-300 hover:text-green-400">
@@ -1130,9 +894,9 @@ function App() {
         </a>
       </div>
     </Section>
-  );
+  ), []);
   
-  const downloadSection = (
+  const downloadSection = useMemo(() => (
     <Section title="Download Resume">
       <div className="text-gray-300 mb-4">
         Click below to download my resume:
@@ -1146,26 +910,56 @@ function App() {
         Download Resume
       </a>
     </Section>
-  );
+  ), []);
 
   const helpText = (
     <div className="text-gray-300">
-      Available commands:
-      <ul className="list-disc list-inside mt-2 ml-4">
-        <li>about - Display information about me</li>
-        <li>projects - Show featured projects</li>
-        <li>skills - List technical skills</li>
-        <li>experience - Show work experience</li>
-        <li>contact - Display contact information</li>
-        <li>download - Download my resume</li>
-        <li>chat - Open `harryAi`</li>
-        <li>matrix - Display Matrix-style animation (close with ✕)</li>
-        <li>game - Play a word guessing game</li>
-        <li>guestbook - View visitor messages</li>
-        <li>sign guestbook - Leave your own message</li>
-        <li>api-status - Check guestbook API connectivity</li>
-        <li>clear - Clear the terminal</li>
-        <li>help - Show this help message</li>
+      <div className="mb-4">
+        <div className="text-yellow-400 mb-2">Portfolio commands:</div>
+        <ul className="list-disc list-inside ml-4 space-y-1">
+          <li>about - Display information about me</li>
+          <li>projects - Show featured projects</li>
+          <li>skills - List technical skills</li>
+          <li>experience - Show work experience</li>
+          <li>contact - Display contact information</li>
+          <li>download - Download my resume</li>
+        </ul>
+      </div>
+      
+      <div className="mb-4">
+        <div className="text-yellow-400 mb-2">Interactive features:</div>
+        <ul className="list-disc list-inside ml-4 space-y-1">
+          <li>chat - Open `harryAi`</li>
+          <li>matrix - Display Matrix-style animation (close with ✕)</li>
+          <li>game - Play a word guessing game</li>
+          <li>guestbook - View visitor messages</li>
+          <li>sign guestbook - Leave your own message</li>
+          <li>api-status - Check guestbook API connectivity</li>
+        </ul>
+      </div>
+      
+      <div className="mb-4">
+        <div className="text-yellow-400 mb-2">Terminal commands:</div>
+        <ul className="list-disc list-inside ml-4 space-y-1">
+          <li>whoami - Show current user</li>
+          <li>date - Display current date and time</li>
+          <li>uptime - Show session uptime</li>
+          <li>history - Show command history</li>
+          <li>pwd - Show current directory</li>  
+          <li>ls - List directory contents</li>
+          <li>clear - Clear the terminal</li>
+          <li>help - Show this help message</li>
+        </ul>
+      </div>
+      
+      <div className="text-yellow-400 mb-2">
+        Keyboard shortcuts:
+      </div>
+      <ul className="list-disc list-inside ml-4 text-sm space-y-1">
+        <li>Tab - Auto-complete commands</li>
+        <li>↑/↓ Arrow keys - Navigate command history</li>
+        <li>Ctrl+L - Clear terminal</li>
+        <li>Ctrl+C - Cancel current input</li>
       </ul>
     </div>
   );
@@ -1302,25 +1096,56 @@ function DownloadSection() {
   );
 }`,
       help: `
-// Help Section Component
+// Help Section Component  
 function HelpSection() {
   return (
     <div className="text-gray-300">
-      Available commands:
-      <ul className="list-disc list-inside mt-2 ml-4">
-        <li>about - Display information about me</li>
-        <li>projects - Show featured projects</li>
-        <li>skills - List technical skills</li>
-        <li>experience - Show work experience</li>
-        <li>contact - Display contact information</li>
-        <li>download - Download my resume</li>
-        <li>chat - Open \`harryAi\`</li>
-        <li>matrix - Display Matrix-style animation (close with ✕)</li>
-        <li>game - Play a word guessing game</li>
-        <li>guestbook - View visitor messages</li>
-        <li>sign guestbook - Leave your own message</li>
-        <li>clear - Clear the terminal</li>
-        <li>help - Show this help message</li>
+      <div className="mb-4">
+        <div className="text-yellow-400 mb-2">Portfolio commands:</div>
+        <ul className="list-disc list-inside ml-4 space-y-1">
+          <li>about - Display information about me</li>
+          <li>projects - Show featured projects</li>
+          <li>skills - List technical skills</li>
+          <li>experience - Show work experience</li>
+          <li>contact - Display contact information</li>
+          <li>download - Download my resume</li>
+        </ul>
+      </div>
+      
+      <div className="mb-4">
+        <div className="text-yellow-400 mb-2">Interactive features:</div>
+        <ul className="list-disc list-inside ml-4 space-y-1">
+          <li>chat - Open \`harryAi\`</li>
+          <li>matrix - Display Matrix-style animation (close with ✕)</li>
+          <li>game - Play a word guessing game</li>
+          <li>guestbook - View visitor messages</li>
+          <li>sign guestbook - Leave your own message</li>
+          <li>api-status - Check guestbook API connectivity</li>
+        </ul>
+      </div>
+      
+      <div className="mb-4">
+        <div className="text-yellow-400 mb-2">Terminal commands:</div>
+        <ul className="list-disc list-inside ml-4 space-y-1">
+          <li>whoami - Show current user</li>
+          <li>date - Display current date and time</li>
+          <li>uptime - Show session uptime</li>
+          <li>history - Show command history</li>
+          <li>pwd - Show current directory</li>  
+          <li>ls - List directory contents</li>
+          <li>clear - Clear the terminal</li>
+          <li>help - Show this help message</li>
+        </ul>
+      </div>
+      
+      <div className="text-yellow-400 mb-2">
+        Keyboard shortcuts:
+      </div>
+      <ul className="list-disc list-inside ml-4 text-sm space-y-1">
+        <li>Tab - Auto-complete commands</li>
+        <li>↑/↓ Arrow keys - Navigate command history</li>
+        <li>Ctrl+L - Clear terminal</li>
+        <li>Ctrl+C - Cancel current input</li>
       </ul>
     </div>
   );
@@ -1333,6 +1158,9 @@ function HelpSection() {
   const handleCommand = (cmd: string) => {
     const command = cmd.trim().toLowerCase();
     let output: React.ReactNode;
+    
+    // Play command sound
+    terminalSounds.playCommand();
 
     // Handle guestbook signing process
     if (isSigningGuestbook) {
@@ -1364,7 +1192,6 @@ function HelpSection() {
           output = <span className="text-red-400">Please enter a message.</span>;
         } else {
           // Save message and complete the process
-          setGuestbookMessage(command);
           setGuestbookStep('complete');
           
           // Show loading state
@@ -1509,8 +1336,10 @@ function HelpSection() {
     if (isPlayingGame && !['exit', 'hint'].includes(command)) {
       if (command === '') {
         output = <span className="text-gray-400">Please enter a 5-letter word as your guess.</span>;
+      } else if (!wordGuessGameInstance) {
+        output = <span className="text-gray-400">Loading game...</span>;
       } else {
-        const result = wordGuessGame.processGuess(
+        const result = wordGuessGameInstance.processGuess(
           command, 
           gameWord, 
           gameCategory,
@@ -1528,6 +1357,12 @@ function HelpSection() {
           setIsPlayingGame(false);
           // Reset hint state for next game
           setShowGameHint(false);
+          // Play appropriate sound
+          if (result.isCorrect) {
+            terminalSounds.playSuccess();
+          } else {
+            terminalSounds.playError();
+          }
         }
         
         output = result.output;
@@ -1548,7 +1383,7 @@ function HelpSection() {
       setShowGameHint(true);
       output = (
         <div className="space-y-2">
-          <div className="text-blue-400">{wordGuessGame.getHint(gameCategory)}</div>
+          <div className="text-blue-400">{wordGuessGameInstance?.getHint(gameCategory) || `Hint: This word is in the category of "${gameCategory}".`}</div>
           {formatAlphabet(gameGuessedLetters, gameWord)}
           <div className="text-gray-400">
             You have {gameMaxAttempts - gameAttempts} {gameMaxAttempts - gameAttempts === 1 ? 'attempt' : 'attempts'} left.
@@ -1614,7 +1449,7 @@ function HelpSection() {
       };
       
       // Add a fallback timer in case the onComplete event never triggers
-      const fallbackTimer = setTimeout(() => {
+      setTimeout(() => {
         setHistory(prev => {
           const index = prev.findIndex(entry => entry.id === randomId);
           if (index !== -1 && prev[index].output && typeof prev[index].output !== 'string') {
@@ -1664,68 +1499,101 @@ function HelpSection() {
       case 'chat':
         // Add a chat command that opens an iframe
         output = (
-          <ChatFrame 
-            onClose={() => {
-              // Remove the chat frame from history when closed
-              setHistory(prev => prev.filter(entry => 
-                !(entry.command === 'chat' && entry.output && typeof entry.output !== 'string')
-              ));
-            }} 
-          />
+          <Suspense fallback={<div className="text-gray-400">Loading chat...</div>}>
+            <ChatFrame 
+              onClose={() => {
+                // Remove the chat frame from history when closed
+                setHistory(prev => prev.filter(entry => 
+                  !(entry.command === 'chat' && entry.output && typeof entry.output !== 'string')
+                ));
+              }} 
+            />
+          </Suspense>
         );
         break;
       case 'matrix':
         // Launch the Matrix animation
         output = (
-          <MatrixRain 
-            onClose={() => {
-              // Add a tiny delay before removing from history to avoid any event conflicts
-              setTimeout(() => {
-                setHistory(prev => prev.filter(entry => 
-                  !(entry.command === 'matrix' && entry.output && typeof entry.output !== 'string')
-                ));
-              }, 100);
-            }} 
-          />
+          <Suspense fallback={<div className="text-gray-400">Loading Matrix...</div>}>
+            <MatrixRain 
+              onClose={() => {
+                // Add a tiny delay before removing from history to avoid any event conflicts
+                setTimeout(() => {
+                  setHistory(prev => prev.filter(entry => 
+                    !(entry.command === 'matrix' && entry.output && typeof entry.output !== 'string')
+                  ));
+                }, 100);
+              }} 
+            />
+          </Suspense>
         );
         break;
-      case 'game':
-        // Initialize the word-guess game
-        const randomWordData = wordGuessGame.getRandomWord();
-        setGameWord(randomWordData.word);
-        setGameCategory(randomWordData.category);
+      case 'game': {
+        setIsPlayingGame(true);
         setGameAttempts(0);
         setGameGuessedLetters(new Set());
         setShowGameHint(false);
-        setIsPlayingGame(true);
+        
         output = (
           <div className="space-y-2">
             <div className="text-green-400 font-bold">🎮 Word-Guess Game</div>
             <div className="text-gray-300">
-              I'm thinking of a 5-letter word. You have {gameMaxAttempts} attempts to guess it.
-            </div>
-            <div className="text-gray-300">
-              Type your guess (5 letters) and press Enter.
-            </div>
-            <div className="text-gray-400 mt-2">
-              <span className="text-green-500 font-bold">Green</span> = correct letter in correct position
-              <br />
-              <span className="text-yellow-500 font-bold">Yellow</span> = correct letter in wrong position
-              <br />
-              <span className="text-gray-500">Gray</span> = letter not in the word
-            </div>
-            <div className="text-gray-400 mt-2">
-              Letters in the word will appear <span className="text-blue-400 font-bold">blue</span> in the alphabet below.
-              <br />
-              Letters not in the word will appear <span className="text-red-400 font-bold">red</span>.
-            </div>
-            {formatAlphabet(new Set(), randomWordData.word)}
-            <div className="text-gray-400 italic mt-2">
-              Type 'hint' for a category hint, or 'exit' to quit.
+              Loading game... Please wait.
             </div>
           </div>
         );
+        
+        // Initialize game asynchronously
+        import('./components/WordGuessGame').then((gameModule) => {
+          const gameInstance = gameModule.default();
+          setWordGuessGameInstance(gameInstance);
+          
+          const randomWordData = gameInstance.getRandomWord();
+          setGameWord(randomWordData.word);
+          setGameCategory(randomWordData.category);
+          
+          // Update the output with the full game interface
+          setHistory(prev => {
+            const gameIndex = prev.findLastIndex(entry => entry.command === 'game');
+            if (gameIndex !== -1) {
+              const newHistory = [...prev];
+              newHistory[gameIndex] = {
+                command: 'game',
+                output: (
+                  <div className="space-y-2">
+                    <div className="text-green-400 font-bold">🎮 Word-Guess Game</div>
+                    <div className="text-gray-300">
+                      I'm thinking of a 5-letter word. You have {gameMaxAttempts} attempts to guess it.
+                    </div>
+                    <div className="text-gray-300">
+                      Type your guess (5 letters) and press Enter.
+                    </div>
+                    <div className="text-gray-400 mt-2">
+                      <span className="text-green-500 font-bold">Green</span> = correct letter in correct position
+                      <br />
+                      <span className="text-yellow-500 font-bold">Yellow</span> = correct letter in wrong position
+                      <br />
+                      <span className="text-gray-500">Gray</span> = letter not in the word
+                    </div>
+                    <div className="text-gray-400 mt-2">
+                      Letters in the word will appear <span className="text-blue-400 font-bold">blue</span> in the alphabet below.
+                      <br />
+                      Letters not in the word will appear <span className="text-red-400 font-bold">red</span>.
+                    </div>
+                    {formatAlphabet(new Set(), randomWordData.word)}
+                    <div className="text-gray-400 italic mt-2">
+                      Type 'hint' for a category hint, or 'exit' to quit.
+                    </div>
+                  </div>
+                )
+              };
+              return newHistory;
+            }
+            return prev;
+          });
+        });
         break;
+      }
       case 'exit':
         if (isPlayingGame) {
           setIsPlayingGame(false);
@@ -1855,18 +1723,18 @@ function HelpSection() {
                   let possibleEntries = null;
                   
                   // Recursively search for an array of objects with id, name, and message properties
-                  const findEntries = (obj: any, depth = 0): any[] | null => {
+                  const findEntries = (obj: unknown, depth = 0): GuestbookEntry[] | null => {
                     if (depth > 3) return null; // Limit recursion depth
                     
                     if (Array.isArray(obj) && obj.length > 0 && 
                         obj[0] && typeof obj[0] === 'object' && 
                         'id' in obj[0] && 'name' in obj[0] && 'message' in obj[0]) {
-                      return obj;
+                      return obj as GuestbookEntry[];
                     }
                     
-                    if (obj && typeof obj === 'object') {
+                    if (obj && typeof obj === 'object' && obj !== null) {
                       for (const key in obj) {
-                        const result = findEntries(obj[key], depth + 1);
+                        const result = findEntries((obj as Record<string, unknown>)[key], depth + 1);
                         if (result) return result;
                       }
                     }
@@ -2146,6 +2014,77 @@ function HelpSection() {
           </div>
         );
         break;
+      case 'whoami':
+        output = <span className="text-green-400">guest</span>;
+        break;
+      case 'date':
+        output = <span className="text-gray-300">{new Date().toString()}</span>;
+        break;
+      case 'uptime': {
+        const uptimeMs = Date.now() - appStartTime;
+        const uptimeSeconds = Math.floor(uptimeMs / 1000);
+        const minutes = Math.floor(uptimeSeconds / 60);
+        const seconds = uptimeSeconds % 60;
+        const hours = Math.floor(minutes / 60);
+        const displayMinutes = minutes % 60;
+        
+        let uptimeStr = '';
+        if (hours > 0) uptimeStr += `${hours} hour${hours > 1 ? 's' : ''} `;
+        if (displayMinutes > 0) uptimeStr += `${displayMinutes} minute${displayMinutes > 1 ? 's' : ''} `;
+        uptimeStr += `${seconds} second${seconds !== 1 ? 's' : ''}`;
+        
+        output = (
+          <div className="text-gray-300">
+            <div>fumblebee.site has been running for: {uptimeStr}</div>
+            <div className="text-gray-500 text-sm mt-1">Session started: {new Date(appStartTime).toLocaleString()}</div>
+          </div>
+        );
+        break;
+      }
+      case 'history':
+        // Get command history from TerminalInterface (we need to pass it down)
+        output = (
+          <div className="text-gray-300">
+            <div className="mb-2">Command history:</div>
+            {history.length === 0 ? (
+              <div className="text-gray-500 italic">No commands in history</div>
+            ) : (
+              <div className="space-y-1">
+                {history.map((cmd, index) => (
+                  <div key={index} className="text-sm">
+                    <span className="text-yellow-400">{index + 1}</span>
+                    <span className="ml-2">{cmd.command}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+        break;
+      case 'pwd':
+        output = <span className="text-green-400">/home/guest/portfolio</span>;
+        break;
+      case 'ls':
+        output = (
+          <div className="text-gray-300 font-mono">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <span className="text-blue-400">about/</span>
+              <span className="text-blue-400">projects/</span>
+              <span className="text-blue-400">skills/</span>
+              <span className="text-blue-400">experience/</span>
+              <span className="text-blue-400">contact/</span>
+              <span className="text-green-400">resume.pdf</span>
+              <span className="text-yellow-400">game.exe</span>
+              <span className="text-purple-400">matrix.sh</span>
+              <span className="text-cyan-400">chat.app</span>
+              <span className="text-orange-400">guestbook.db</span>
+            </div>
+            <div className="text-gray-500 text-sm mt-2">
+              Directories are shown in blue, executables in colors
+            </div>
+          </div>
+        );
+        break;
       case 'clear':
         setHistory([]);
         setCurrentCommand('');
@@ -2155,6 +2094,7 @@ function HelpSection() {
         break;
       default:
         output = <span className="text-red-400">Command not found. Type 'help' for available commands.</span>;
+        terminalSounds.playError();
     }
 
     // Only add to history if we have output to show and we haven't already handled it
@@ -2209,7 +2149,7 @@ function HelpSection() {
     );
   };
 
-  const allContentSection = (
+  const allContentSection = useMemo(() => (
     <div className="mt-8 space-y-12">
       {aboutSection}
       {skillsSection}
@@ -2218,7 +2158,7 @@ function HelpSection() {
       {contactSection}
       {downloadSection}
     </div>
-  );
+  ), [aboutSection, skillsSection, experienceSection, projectSection, contactSection, downloadSection]);
 
   return (
     <div className="min-h-screen bg-black text-green-400 font-mono p-4 md:px-8">
@@ -2240,7 +2180,10 @@ function HelpSection() {
               <Terminal className="w-6 h-6 mr-2" />
               <TypewriterText 
                 text="Welcome to fumblebee.site. Type 'help' for available commands." 
-                onComplete={() => setShowWelcome(false)}
+                onComplete={() => {
+                  setShowWelcome(false);
+                  terminalSounds.playBootup();
+                }}
               />
             </div>
           ) : (
@@ -2251,6 +2194,8 @@ function HelpSection() {
                 currentCommand={currentCommand}
                 onCommandChange={setCurrentCommand}
                 onCommandSubmit={handleCommand}
+                soundEnabled={soundEnabled}
+                onSoundToggle={toggleSound}
               />
               <div className="fixed bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black to-transparent z-10 pointer-events-none md:hidden"></div>
             </div>
