@@ -390,7 +390,7 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
       <div 
         ref={terminalRef}
         className="terminal-container bg-black text-green-400 p-4 rounded-md overflow-y-auto h-[calc(100vh-2rem)] max-h-[800px] w-full max-w-4xl mx-auto [scrollbar-width:none] hover:[scrollbar-width:auto]"
-        style={{msOverflowStyle: "none"}}
+        style={{msOverflowStyle: "none", minWidth: "min(800px, 100vw - 2rem)"}}
         onClick={() => inputRef.current?.focus()}
       >
       {history.map((entry, i) => (
@@ -518,6 +518,7 @@ function App() {
   const [isSigningGuestbook, setIsSigningGuestbook] = useState(false);
   const [guestbookStep, setGuestbookStep] = useState<'name' | 'message' | 'complete'>('name');
   const [guestbookName, setGuestbookName] = useState('');
+  const [guestbookMessage, setGuestbookMessage] = useState('');
   const [guestbookEntries, setGuestbookEntries] = useState<GuestbookEntry[]>([]);
   const [guestbookLoading, setGuestbookLoading] = useState(false);
   const [guestbookError, setGuestbookError] = useState('');
@@ -632,7 +633,7 @@ function App() {
   }, [API_URL, checkRateLimit, testCorsSetup]);
   
   // Function to fetch guestbook entries
-  const fetchGuestbookEntries = useCallback(async (page = 1, limit = 20) => {
+  const fetchGuestbookEntries = useCallback(async (page = 1, limit = 5) => {
     setGuestbookLoading(true);
     setGuestbookError('');
     try {
@@ -929,7 +930,7 @@ function App() {
       <div className="mb-4">
         <div className="text-yellow-400 mb-2">Interactive features:</div>
         <ul className="list-disc list-inside ml-4 space-y-1">
-          <li>chat - Open `harryAi`</li>
+          <li>chat - Open harryAi chat</li>
           <li>matrix - Display Matrix-style animation (close with ✕)</li>
           <li>game - Play a word guessing game</li>
           <li>guestbook - View visitor messages</li>
@@ -938,29 +939,6 @@ function App() {
         </ul>
       </div>
       
-      <div className="mb-4">
-        <div className="text-yellow-400 mb-2">Terminal commands:</div>
-        <ul className="list-disc list-inside ml-4 space-y-1">
-          <li>whoami - Show current user</li>
-          <li>date - Display current date and time</li>
-          <li>uptime - Show session uptime</li>
-          <li>history - Show command history</li>
-          <li>pwd - Show current directory</li>  
-          <li>ls - List directory contents</li>
-          <li>clear - Clear the terminal</li>
-          <li>help - Show this help message</li>
-        </ul>
-      </div>
-      
-      <div className="text-yellow-400 mb-2">
-        Keyboard shortcuts:
-      </div>
-      <ul className="list-disc list-inside ml-4 text-sm space-y-1">
-        <li>Tab - Auto-complete commands</li>
-        <li>↑/↓ Arrow keys - Navigate command history</li>
-        <li>Ctrl+L - Clear terminal</li>
-        <li>Ctrl+C - Cancel current input</li>
-      </ul>
     </div>
   );
 
@@ -1115,7 +1093,7 @@ function HelpSection() {
       <div className="mb-4">
         <div className="text-yellow-400 mb-2">Interactive features:</div>
         <ul className="list-disc list-inside ml-4 space-y-1">
-          <li>chat - Open \`harryAi\`</li>
+          <li>chat - Open harryAi chat</li>
           <li>matrix - Display Matrix-style animation (close with ✕)</li>
           <li>game - Play a word guessing game</li>
           <li>guestbook - View visitor messages</li>
@@ -1124,29 +1102,6 @@ function HelpSection() {
         </ul>
       </div>
       
-      <div className="mb-4">
-        <div className="text-yellow-400 mb-2">Terminal commands:</div>
-        <ul className="list-disc list-inside ml-4 space-y-1">
-          <li>whoami - Show current user</li>
-          <li>date - Display current date and time</li>
-          <li>uptime - Show session uptime</li>
-          <li>history - Show command history</li>
-          <li>pwd - Show current directory</li>  
-          <li>ls - List directory contents</li>
-          <li>clear - Clear the terminal</li>
-          <li>help - Show this help message</li>
-        </ul>
-      </div>
-      
-      <div className="text-yellow-400 mb-2">
-        Keyboard shortcuts:
-      </div>
-      <ul className="list-disc list-inside ml-4 text-sm space-y-1">
-        <li>Tab - Auto-complete commands</li>
-        <li>↑/↓ Arrow keys - Navigate command history</li>
-        <li>Ctrl+L - Clear terminal</li>
-        <li>Ctrl+C - Cancel current input</li>
-      </ul>
     </div>
   );
 }`
@@ -1172,13 +1127,14 @@ function HelpSection() {
         if (command.trim() === '') {
           output = <span className="text-red-400">Please enter your name.</span>;
         } else {
-          // Save name and move to message step
-          setGuestbookName(command);
+          // Save name and move to message step - use the raw input, not the full command
+          const userName = cmd.trim(); // Use cmd (original input) instead of command (lowercased)
+          setGuestbookName(userName);
           setGuestbookStep('message');
           output = (
             <div className="space-y-2">
               <div className="text-green-400">
-                Step 2: Thanks, {command}! Now please enter your message.
+                Step 2: Thanks, {userName}! Now please enter your message.
               </div>
               <div className="text-gray-400 italic">
                 (Type 'exit' to cancel)
@@ -1210,7 +1166,7 @@ function HelpSection() {
           // Submit to API asynchronously
           (async () => {
             try {
-              const success = await submitGuestbookEntry(guestbookName, command);
+              const success = await submitGuestbookEntry(guestbookName, cmd.trim()); // Use cmd instead of command
               
               // Reset signing state whether successful or not
               setIsSigningGuestbook(false);
@@ -1220,14 +1176,14 @@ function HelpSection() {
                 const successOutput = (
                   <div className="space-y-2">
                     <div className="text-green-400">
-                      ✅ Thank you for signing the guestbook!
+                      :-) Thank you for signing the guest book!
                     </div>
                     <div className="bg-gray-900 bg-opacity-50 p-3 rounded-md">
                       <div className="flex justify-between">
                         <span className="text-yellow-400 font-medium">{guestbookName}</span>
                         <span className="text-gray-500 text-sm">{new Date().toISOString().split('T')[0]}</span>
                       </div>
-                      <div className="text-gray-300 mt-1">{command}</div>
+                      <div className="text-gray-300 mt-1">{cmd.trim()}</div>
                     </div>
                     <div className="text-gray-400 mt-2">
                       Type <span className="text-green-400">guestbook</span> to view all entries.
@@ -1261,7 +1217,7 @@ function HelpSection() {
                 const errorOutput = (
                   <div className="space-y-2">
                     <div className="text-red-400">
-                      ❌ There was a problem submitting your entry: {guestbookError}
+                      :-( There was a problem submitting your entry: {guestbookError}
                     </div>
                     <div className="text-gray-400 mt-2">
                       Please try again later.
@@ -1299,7 +1255,7 @@ function HelpSection() {
               const errorOutput = (
                 <div className="space-y-2">
                   <div className="text-red-400">
-                    ❌ Unexpected error: {error instanceof Error ? error.message : 'Unknown error'}
+                    :-( Unexpected error: {error instanceof Error ? error.message : 'Unknown error'}
                   </div>
                   <div className="text-gray-400 mt-2">
                     Please try again later.
@@ -1536,7 +1492,7 @@ function HelpSection() {
         
         output = (
           <div className="space-y-2">
-            <div className="text-green-400 font-bold">🎮 Word-Guess Game</div>
+            <div className="text-green-400 font-bold">Word-Guess Game</div>
             <div className="text-gray-300">
               Loading game... Please wait.
             </div>
@@ -1561,7 +1517,7 @@ function HelpSection() {
                 command: 'game',
                 output: (
                   <div className="space-y-2">
-                    <div className="text-green-400 font-bold">🎮 Word-Guess Game</div>
+                    <div className="text-green-400 font-bold">Word-Guess Game</div>
                     <div className="text-gray-300">
                       I'm thinking of a 5-letter word. You have {gameMaxAttempts} attempts to guess it.
                     </div>
@@ -1674,328 +1630,51 @@ function HelpSection() {
         // Return immediately since we've already handled adding to history
         return;
       case 'guestbook':
-        // Show loading state immediately
-        setGuestbookLoading(true);
-        output = (
+        // Create a simple guestbook display showing most recent 5 entries
+        const GuestbookDisplay = () => (
           <div className="space-y-4">
-            <div className="text-green-400 font-bold text-lg mb-2">📖 Guestbook</div>
-            <div className="text-gray-400 flex items-center">
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              Loading guestbook entries...
+            <div className="text-green-400 font-bold text-lg mb-2">Guest Book</div>
+            
+            {guestbookLoading && guestbookEntries.length === 0 ? (
+              <div className="text-gray-400">Loading guest book entries...</div>
+            ) : guestbookError && guestbookEntries.length === 0 ? (
+              <div className="text-red-400">{guestbookError}</div>
+            ) : guestbookEntries.length === 0 ? (
+              <div className="text-gray-400">No entries found. Be the first to sign!</div>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-gray-400 text-sm">Most recent {Math.min(5, guestbookEntries.length)} signatures:</div>
+                {guestbookEntries.slice(0, 5).map(entry => (
+                  <div key={entry.id} className="bg-gray-900 bg-opacity-50 p-3 rounded-md">
+                    <div className="flex justify-between">
+                      <span className="text-yellow-400 font-medium">{entry.name}</span>
+                      <span className="text-gray-500 text-sm">{entry.date}</span>
+                    </div>
+                    <div className="text-gray-300 mt-1">{entry.message}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div className="text-gray-400 mt-2">
+              Type <span className="text-green-400">sign guestbook</span> to add your own message.
             </div>
           </div>
         );
+
+        output = <GuestbookDisplay />;
         
-        // Add this initial loading state to history for immediate feedback
-        setHistory(prev => [...prev, { command: cmd, output }]);
-        setCurrentCommand('');
-        
-        // Fetch entries asynchronously
-        (async () => {
-          try {
-            // Create local entries variable to use directly in rendering
-            let localEntries: GuestbookEntry[] = [];
-            
+        // Fetch entries asynchronously on first load
+        if (guestbookEntries.length === 0) {
+          (async () => {
             try {
-              // Force loading state to be true
-              setGuestbookLoading(true);
-              
-              // Fetch entries and store the response directly in local variable
-              const entriesData = await fetchGuestbookEntries(1);
-              
-              // Log for debugging
-              console.log('Guestbook API response:', entriesData);
-              
-              // WORKAROUND: Direct extraction of entries from response
-              if (entriesData && typeof entriesData === 'object') {
-                // First try to access the structured response format
-                if (entriesData.entries && Array.isArray(entriesData.entries)) {
-                  localEntries = entriesData.entries;
-                  console.log('Populated localEntries from response.entries:', localEntries.length);
-                } 
-                // Then try other common patterns
-                else if (entriesData.raw && entriesData.raw.entries && Array.isArray(entriesData.raw.entries)) {
-                  localEntries = entriesData.raw.entries;
-                  console.log('Populated localEntries from response.raw.entries:', localEntries.length);
-                }
-                // If all else fails, look for any array structure that could be entries
-                else {
-                  let possibleEntries = null;
-                  
-                  // Recursively search for an array of objects with id, name, and message properties
-                  const findEntries = (obj: unknown, depth = 0): GuestbookEntry[] | null => {
-                    if (depth > 3) return null; // Limit recursion depth
-                    
-                    if (Array.isArray(obj) && obj.length > 0 && 
-                        obj[0] && typeof obj[0] === 'object' && 
-                        'id' in obj[0] && 'name' in obj[0] && 'message' in obj[0]) {
-                      return obj as GuestbookEntry[];
-                    }
-                    
-                    if (obj && typeof obj === 'object' && obj !== null) {
-                      for (const key in obj) {
-                        const result = findEntries((obj as Record<string, unknown>)[key], depth + 1);
-                        if (result) return result;
-                      }
-                    }
-                    
-                    return null;
-                  };
-                  
-                  possibleEntries = findEntries(entriesData);
-                  
-                  if (possibleEntries) {
-                    localEntries = possibleEntries;
-                    console.log('Found entries through deep search:', localEntries.length);
-                  }
-                }
-                
-                // If we found entries, update state too
-                if (localEntries.length > 0) {
-                  setGuestbookEntries(localEntries);
-                }
-              }
-              
-              // First check if entries were properly set in state by the fetchGuestbookEntries function
-              if (guestbookEntries && guestbookEntries.length > 0) {
-                console.log('Using entries from state:', guestbookEntries);
-                localEntries = [...guestbookEntries];
-              }
-              // If no entries in state, try to extract them from the response directly
-              else if (entriesData) {
-                // Check if entries exist in the response in the expected format
-                if (entriesData.entries && Array.isArray(entriesData.entries) && entriesData.entries.length > 0) {
-                  console.log('Using entries directly from response:', entriesData.entries);
-                  localEntries = entriesData.entries;
-                  // Also update state for future reference
-                  setGuestbookEntries(entriesData.entries);
-                }
-                // Attempt different access patterns if not found in the expected location
-                else {
-                  // Check various patterns for entries
-                  if (Array.isArray(entriesData)) {
-                    // Maybe the entries are at the top level
-                    localEntries = entriesData;
-                  } else if (entriesData.data && Array.isArray(entriesData.data)) {
-                    // Maybe entries are in a data field
-                    localEntries = entriesData.data;
-                  } else if (entriesData.results && Array.isArray(entriesData.results)) {
-                    // Maybe entries are in a results field
-                    localEntries = entriesData.results;
-                  }
-                  
-                  // If we found entries in an alternative location, use them
-                  if (localEntries.length > 0) {
-                    console.log('Found entries in alternative location:', localEntries);
-                    // Also update state for future reference
-                    setGuestbookEntries(localEntries);
-                  }
-                }
-              }
+              await fetchGuestbookEntries(1);
             } catch (error) {
-              console.error('Error extracting entries data:', error);
+              console.error('Error loading guestbook:', error);
             }
-            
-            // Create full output with fetched entries
-            const entriesOutput = (
-              <div className="space-y-4">
-                <div className="text-green-400 font-bold text-lg mb-2">📖 Guestbook</div>
-                
-                {guestbookLoading && !localEntries.length ? (
-                  <div className="text-gray-400 flex items-center">
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Loading guestbook entries...
-                  </div>
-                ) : guestbookError && !localEntries.length ? (
-                  <div className="text-red-400">{guestbookError}</div>
-                ) : localEntries.length === 0 ? (
-                  <div className="text-gray-400">
-                    <div>No entries found in rendered component.</div>
-                    {/* Debug info to help diagnose the issue */}
-                    <div className="mt-2 text-sm">Debug Info:</div>
-                    <div className="text-xs space-y-1 mt-1">
-                      <div>localEntries length: {localEntries?.length || 0}</div>
-                      <div>guestbookEntries length: {guestbookEntries?.length || 0}</div>
-                      <div>API response valid: {entriesData ? 'Yes' : 'No'}</div>
-                      {entriesData?.raw?.entries ? (
-                        <div>Raw entries count: {Array.isArray(entriesData.raw.entries) ? entriesData.raw.entries.length : 'Not an array'}</div>
-                      ) : null}
-                    </div>
-                    <button 
-                      onClick={() => {
-                        // Set sample entries for testing when API fails
-                        const sampleEntries = [
-                          {
-                            id: 'sample1',
-                            name: 'Sample User',
-                            message: 'This is a sample guestbook entry for testing.',
-                            date: new Date().toISOString().split('T')[0]
-                          },
-                          {
-                            id: 'sample2',
-                            name: 'Another Visitor',
-                            message: 'Thanks for the cool terminal portfolio!',
-                            date: new Date().toISOString().split('T')[0]
-                          }
-                        ];
-                        // Set both local entries and state entries
-                        localEntries = [...sampleEntries];
-                        setGuestbookEntries(sampleEntries);
-                        
-                        // Force rerender by updating history
-                        setHistory(prev => {
-                          const latestIndex = prev.findIndex(
-                            item => item.command === 'guestbook' && 
-                            typeof item.output === 'object' && 
-                            item.output !== null
-                          );
-                          
-                          if (latestIndex !== -1) {
-                            // Clone the history
-                            const newHistory = [...prev];
-                            // Replace with success message
-                            newHistory[latestIndex] = { 
-                              command: 'guestbook', 
-                              output: (
-                                <div className="space-y-4">
-                                  <div className="text-green-400 font-bold text-lg mb-2">📖 Guestbook</div>
-                                  <div className="space-y-3">
-                                    {sampleEntries.map(entry => (
-                                      <div key={entry.id} className="bg-gray-900 bg-opacity-50 p-3 rounded-md">
-                                        <div className="flex justify-between">
-                                          <span className="text-yellow-400 font-medium">{entry.name}</span>
-                                          <span className="text-gray-500 text-sm">{entry.date}</span>
-                                        </div>
-                                        <div className="text-gray-300 mt-1">{entry.message}</div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <div className="text-gray-400 mt-2">
-                                    Type <span className="text-green-400">sign guestbook</span> to add your own message.
-                                  </div>
-                                </div>
-                              )
-                            };
-                            return newHistory;
-                          }
-                          return prev;
-                        });
-                      }}
-                      className="mt-3 px-3 py-1 rounded bg-gray-800 text-green-400 hover:bg-gray-700 text-sm"
-                    >
-                      Load Sample Entries
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {localEntries.map(entry => (
-                      <div key={entry.id} className="bg-gray-900 bg-opacity-50 p-3 rounded-md">
-                        <div className="flex justify-between">
-                          <span className="text-yellow-400 font-medium">{entry.name}</span>
-                          <span className="text-gray-500 text-sm">{entry.date}</span>
-                        </div>
-                        <div className="text-gray-300 mt-1">{entry.message}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                {guestbookTotalPages > 1 && (
-                  <div className="flex justify-between items-center mt-4">
-                    <button 
-                      onClick={async () => {
-                        if (guestbookPage > 1 && !guestbookLoading) {
-                          setGuestbookLoading(true);
-                          await fetchGuestbookEntries(guestbookPage - 1);
-                        }
-                      }}
-                      className={`px-3 py-1 rounded flex items-center ${guestbookPage > 1 && !guestbookLoading
-                        ? 'bg-gray-800 text-green-400 hover:bg-gray-700' 
-                        : 'bg-gray-900 text-gray-600 cursor-not-allowed'}`}
-                      disabled={guestbookPage <= 1 || guestbookLoading}
-                    >
-                      {guestbookLoading ? <RefreshCw className="w-3 h-3 mr-1 animate-spin" /> : null}
-                      Previous
-                    </button>
-                    <span className="text-gray-400">
-                      Page {guestbookPage} of {guestbookTotalPages}
-                    </span>
-                    <button 
-                      onClick={async () => {
-                        if (guestbookPage < guestbookTotalPages && !guestbookLoading) {
-                          setGuestbookLoading(true);
-                          await fetchGuestbookEntries(guestbookPage + 1);
-                        }
-                      }}
-                      className={`px-3 py-1 rounded flex items-center ${guestbookPage < guestbookTotalPages && !guestbookLoading
-                        ? 'bg-gray-800 text-green-400 hover:bg-gray-700' 
-                        : 'bg-gray-900 text-gray-600 cursor-not-allowed'}`}
-                      disabled={guestbookPage >= guestbookTotalPages || guestbookLoading}
-                    >
-                      {guestbookLoading ? <RefreshCw className="w-3 h-3 mr-1 animate-spin" /> : null}
-                      Next
-                    </button>
-                  </div>
-                )}
-                
-                <div className="text-gray-400 mt-2">
-                  Type <span className="text-green-400">sign guestbook</span> to add your own message.
-                </div>
-              </div>
-            );
-            
-            // Replace loading state with actual content
-            setHistory(prev => {
-              const latestIndex = prev.findIndex(
-                item => item.command === 'guestbook' && 
-                typeof item.output === 'object' && 
-                item.output !== null
-              );
-              
-              if (latestIndex !== -1) {
-                const updatedHistory = [...prev];
-                updatedHistory[latestIndex] = { 
-                  command: 'guestbook', 
-                  output: entriesOutput 
-                };
-                return updatedHistory;
-              }
-              
-              // If for some reason we can't find the entry, append a new one
-              return [...prev, { command: 'guestbook results', output: entriesOutput }];
-            });
-            
-          } catch (error) {
-            console.error('Error in guestbook command:', error);
-            
-            // Show error message
-            setHistory(prev => {
-              const latestIndex = prev.findLastIndex(
-                item => item.command === 'guestbook'
-              );
-              
-              if (latestIndex !== -1) {
-                const updatedHistory = [...prev];
-                updatedHistory[latestIndex] = { 
-                  command: 'guestbook', 
-                  output: <div className="text-red-400">Error loading guestbook: {error instanceof Error ? error.message : 'Unknown error'}</div>
-                };
-                return updatedHistory;
-              }
-              
-              return [...prev, { 
-                command: 'guestbook', 
-                output: <div className="text-red-400">Error loading guestbook: {error instanceof Error ? error.message : 'Unknown error'}</div>
-              }];
-            });
-          } finally {
-            // Ensure loading state is properly reset
-            setGuestbookLoading(false);
-          }
-        })();
-        
-        // Return immediately since we've already handled adding to history
-        return;
+          })();
+        }
+        break;
       case 'sign guestbook':
         // Start the guestbook signing process
         setIsSigningGuestbook(true);
@@ -2004,7 +1683,7 @@ function HelpSection() {
         setGuestbookMessage('');
         output = (
           <div className="space-y-2">
-            <div className="text-green-400 font-bold">✍️ Sign the Guestbook</div>
+            <div className="text-green-400 font-bold">Sign the Guest Book</div>
             <div className="text-gray-300">
               Step 1: Please enter your name.
             </div>

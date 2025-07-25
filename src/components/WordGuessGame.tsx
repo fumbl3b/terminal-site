@@ -134,7 +134,7 @@ function WordGuessGame() {
               <span className="text-green-400 ml-2">Correct!</span>
             </div>
             <div className="text-green-400">
-              Congratulations! You guessed the word {targetWord} in {attemptNum} {attemptNum === 1 ? 'attempt' : 'attempts'}! 🎉
+              Congratulations! You guessed the word {targetWord} in {attemptNum} {attemptNum === 1 ? 'attempt' : 'attempts'}! :-D
             </div>
             {formatAlphabet(guessedLetters, targetWord)}
             <div className="text-gray-400 mt-2">
