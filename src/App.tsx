@@ -1044,10 +1044,12 @@ function App() {
   const aboutSection = (
     <Section title="About Me">
       <p className="text-gray-300 leading-relaxed">
-        Proficient Software Engineer versed in designing, developing, and maintaining both mobile and web applications. 
-        Extensive experience deploying and maintaining cloud services. Skilled in Java, Kotlin, Javascript ES6, 
-        Typescript and Python. Experience with Test-Driven-Development, ADA Accessible UI implementation, continuous 
-        integration tools, and agile software development methodologies.
+        Dynamic and results-driven Software Engineer and Founding Developer with extensive experience in full-stack, 
+        mobile, and cloud platforms. Specializes in designing and developing scalable, secure mobile applications for iOS 
+        and Android using Swift, Objective-C, Java, and Kotlin. Proven expertise in leading end-to-end product 
+        development and cloud deployment with AWS and GCP. Adept at Agile/Scrum methodologies, DevSecOps, and 
+        CI/CD pipelines. Successfully delivered high-quality mobile applications, optimizing performance and ensuring 
+        compliance with app store guidelines.
       </p>
     </Section>
   );
@@ -1055,15 +1057,15 @@ function App() {
   const projectSection = (
     <Section title="Featured Project">
       <div className="bg-gray-900 p-4 rounded-md mb-4">
-        <h3 className="text-yellow-400 text-lg mb-2">Untitled Resume Tuner</h3>
+        <h3 className="text-yellow-400 text-lg mb-2">Resum8 - AI Resume Optimizer</h3>
         <p className="text-gray-300 mb-4">
-          Resume Tuner is an AI-powered web app designed to optimize your resume for any job application. 
-          With a React frontend and Flask backend, it analyzes both your resume and the job description 
-          to extract key data, suggest tailored improvements, and ensure better alignment with applicant 
-          tracking systems.
+          Resum8 is an AI-powered resume optimization platform designed to help job seekers maximize their chances 
+          with ATS systems. Built with a Flask/Python backend and React/Next.js frontend, Resum8 provides intelligent 
+          resume parsing, ATS keyword extraction, job description analysis, and LaTeX-based PDF generation. 
+          Deployed on Render and Vercel with CI/CD pipelines and comprehensive cloud infrastructure.
         </p>
         <a 
-          href="https://github.com/fumbl3b/resume-updater" 
+          href="https://resum8.xyz" 
           className="inline-flex items-center text-blue-400 hover:text-blue-300"
         >
           <Github className="w-4 h-4 mr-2" />
@@ -1077,15 +1079,23 @@ function App() {
     <Section title="Skills">
       <SkillCategory 
         title="Programming Languages" 
-        skills={["Kotlin", "Java", "TypeScript", "Python", "JavaScript", "C#"]} 
+        skills={["Kotlin", "Java", "Swift", "Objective-C", "TypeScript", "Python", "JavaScript"]} 
       />
       <SkillCategory 
-        title="Frameworks" 
-        skills={["React", "Node.js", "Android SDK", "Next.js", "Express", "Django"]} 
+        title="Mobile Development" 
+        skills={["Android SDK", "Jetpack Compose", "React Native", "RoomDB", "Retrofit", "Coroutines"]} 
       />
       <SkillCategory 
-        title="Cloud & DevOps" 
-        skills={["AWS", "Docker", "Kubernetes", "PostgreSQL", "MongoDB", "Redis"]} 
+        title="Web & Backend" 
+        skills={["React", "Next.js", "Node.js", "Express", "Flask", "Django", "Spring Boot"]} 
+      />
+      <SkillCategory 
+        title="Cloud & Databases" 
+        skills={["AWS", "GCP", "Docker", "Kubernetes", "PostgreSQL", "MongoDB", "Redis", "Supabase"]} 
+      />
+      <SkillCategory 
+        title="DevOps & Tools" 
+        skills={["GitHub Actions", "Jenkins", "Terraform", "SonarQube", "GraphQL", "REST"]} 
       />
     </Section>
   );
@@ -1093,25 +1103,41 @@ function App() {
   const experienceSection = (
     <Section title="Experience">
       <Experience 
+        company="Fumble Labs"
+        role="Founding Developer"
+        period="Jan 2024 – Present"
+        location="Philadelphia"
+        responsibilities={[
+          "Founded and led development of Resum8, an AI-powered resume optimization platform, leveraging Flask, Python, PostgreSQL, React/Next.js, and Docker",
+          "Designed and deployed a resume parsing and PDF generation pipeline integrating LaTeX, ATS keyword extraction, and job description analysis",
+          "Orchestrated cloud deployment workflows with Render, Vercel, and Supabase, establishing CI/CD pipelines and secrets management",
+          "Built API-driven client applications for organizations such as University City District, delivering tailored web platforms that increased user engagement by 30%",
+          "Delivered cross-platform mobile and web solutions, applying Kotlin/Java for Android, React Native for mobile prototypes, and GraphQL/REST APIs"
+        ]}
+      />
+      <Experience 
         company="JP Morgan Chase & Co"
-        role="Software Engineer II"
-        period="Aug 2023 - June 2024"
+        role="Software Engineer II, Reference Data"
+        period="Aug 2023 – Jun 2024"
         location="Wilmington, DE"
         responsibilities={[
-          "Maintained and enhanced legacy Java applications",
-          "Developed new features in Spring Boot and React",
-          "Managed CI pipelines and code quality"
+          "Maintained and enhanced legacy enterprise Java applications, ensuring robust performance, security, and optimized compute costs",
+          "Developed and implemented new features in Spring Boot, React, Java 11+, Kotlin, Maven, Gradle, and REST APIs, enhancing user experience and system reliability",
+          "Utilized SQL, Oracle DB, PostgreSQL, Kafka, JMS, Redis, Docker, Kubernetes, Jenkins, GitHub Actions, AWS, and GCP to deliver scalable services",
+          "Built comprehensive test coverage with JUnit, Mockito, Selenium, and Postman for both backend and frontend services",
+          "Managed CI/CD pipelines, enforcing code quality standards via SonarQube, Checkstyle, and PMD, and maintained technical documentation"
         ]}
       />
       <Experience 
         company="Wells Fargo"
         role="Android Developer"
-        period="Dec 2021 - Jul 2023"
-        location="San Francisco, CA / Remote"
+        period="Dec 2021 – Jul 2023"
+        location="Remote/San Francisco"
         responsibilities={[
-          "Contributed to Android app redevelopment (10M+ downloads)",
-          "Implemented deep linking and Zelle API integration",
-          "Launched LifeSync financial planning tool"
+          "Led the full redevelopment of the Android application, transitioning all features from Java/WebView to full native Kotlin functionality, resulting in a 25% increase in app performance",
+          "Built and optimized features using Android SDK, Jetpack Compose, ViewModel, LiveData, RoomDB, DataStore, Retrofit, OkHttp, RxJava, Coroutines, Dagger/Hilt, and Navigation Component",
+          "Monitored performance and crash data with Firebase Crashlytics, Google Play Console, New Relic, and Splunk for a live application with 10M+ downloads",
+          "Collaborated closely with design and business teams using Figma, Jira, Confluence to launch the new LifeSync financial planning tool, integrating dynamic dashboards and live investment data"
         ]}
       />
     </Section>
@@ -1138,8 +1164,8 @@ function App() {
         Click below to download my resume:
       </div>
       <a 
-        href="/harrison_winkler.pdf" 
-        download="harrison_winkler.pdf"
+        href="/Harry-Winkler.pdf" 
+        download="Harry-Winkler.pdf"
         className="inline-flex items-center px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-600 transition-colors"
       >
         <Download className="w-4 h-4 mr-2" />
@@ -1179,12 +1205,12 @@ function AboutSection() {
   return (
     <Section title="About Me">
       <p className="text-gray-300 leading-relaxed">
-        Proficient Software Engineer versed in designing, developing, 
-        and maintaining both mobile and web applications. 
-        Extensive experience deploying and maintaining cloud services. 
-        Skilled in Java, Kotlin, Javascript ES6, Typescript and Python. 
-        Experience with Test-Driven-Development, ADA Accessible UI implementation, 
-        continuous integration tools, and agile software development methodologies.
+        Dynamic and results-driven Software Engineer and Founding Developer with extensive experience in full-stack, 
+        mobile, and cloud platforms. Specializes in designing and developing scalable, secure mobile applications for iOS 
+        and Android using Swift, Objective-C, Java, and Kotlin. Proven expertise in leading end-to-end product 
+        development and cloud deployment with AWS and GCP. Adept at Agile/Scrum methodologies, DevSecOps, and 
+        CI/CD pipelines. Successfully delivered high-quality mobile applications, optimizing performance and ensuring 
+        compliance with app store guidelines.
       </p>
     </Section>
   );
@@ -1195,16 +1221,15 @@ function ProjectSection() {
   return (
     <Section title="Featured Project">
       <div className="bg-gray-900 p-4 rounded-md mb-4">
-        <h3 className="text-yellow-400 text-lg mb-2">Untitled Resume Tuner</h3>
+        <h3 className="text-yellow-400 text-lg mb-2">Resum8 - AI Resume Optimizer</h3>
         <p className="text-gray-300 mb-4">
-          Resume Tuner is an AI-powered web app designed to optimize your resume 
-          for any job application. With a React frontend and Flask backend, 
-          it analyzes both your resume and the job description to extract key data, 
-          suggest tailored improvements, and ensure better alignment with 
-          applicant tracking systems.
+          Resum8 is an AI-powered resume optimization platform designed to help job seekers maximize their chances 
+          with ATS systems. Built with a Flask/Python backend and React/Next.js frontend, Resum8 provides intelligent 
+          resume parsing, ATS keyword extraction, job description analysis, and LaTeX-based PDF generation. 
+          Deployed on Render and Vercel with CI/CD pipelines and comprehensive cloud infrastructure.
         </p>
         <a 
-          href="https://github.com" 
+          href="https://github.com/fumbl3b/resume-updater" 
           className="inline-flex items-center text-blue-400 hover:text-blue-300"
         >
           <Github className="w-4 h-4 mr-2" />
@@ -1221,15 +1246,23 @@ function SkillsSection() {
     <Section title="Skills">
       <SkillCategory 
         title="Programming Languages" 
-        skills={["Kotlin", "Java", "TypeScript", "Python", "JavaScript", "C#"]} 
+        skills={["Kotlin", "Java", "Swift", "Objective-C", "TypeScript", "Python", "JavaScript"]} 
       />
       <SkillCategory 
-        title="Frameworks" 
-        skills={["React", "Node.js", "Android SDK", "Next.js", "Express", "Django"]} 
+        title="Mobile Development" 
+        skills={["Android SDK", "Jetpack Compose", "React Native", "RoomDB", "Retrofit", "Coroutines"]} 
       />
       <SkillCategory 
-        title="Cloud & DevOps" 
-        skills={["AWS", "Docker", "Kubernetes", "PostgreSQL", "MongoDB", "Redis"]} 
+        title="Web & Backend" 
+        skills={["React", "Next.js", "Node.js", "Express", "Flask", "Django", "Spring Boot"]} 
+      />
+      <SkillCategory 
+        title="Cloud & Databases" 
+        skills={["AWS", "GCP", "Docker", "Kubernetes", "PostgreSQL", "MongoDB", "Redis", "Supabase"]} 
+      />
+      <SkillCategory 
+        title="DevOps & Tools" 
+        skills={["GitHub Actions", "Jenkins", "Terraform", "SonarQube", "GraphQL", "REST"]} 
       />
     </Section>
   );
@@ -1240,25 +1273,34 @@ function ExperienceSection() {
   return (
     <Section title="Experience">
       <Experience 
+        company="Fumble Labs"
+        role="Founding Developer"
+        period="Jan 2024 – Present"
+        location="Philadelphia"
+        responsibilities={[
+          "Founded and led development of Resum8, an AI-powered resume optimization platform, leveraging Flask, Python, PostgreSQL, React/Next.js, and Docker",
+          "Designed and deployed a resume parsing and PDF generation pipeline integrating LaTeX, ATS keyword extraction, and job description analysis",
+          "Orchestrated cloud deployment workflows with Render, Vercel, and Supabase, establishing CI/CD pipelines and secrets management"
+        ]}
+      />
+      <Experience 
         company="JP Morgan Chase & Co"
-        role="Software Engineer II"
-        period="Aug 2023 - June 2024"
+        role="Software Engineer II, Reference Data"
+        period="Aug 2023 – Jun 2024"
         location="Wilmington, DE"
         responsibilities={[
-          "Maintained and enhanced legacy Java applications",
-          "Developed new features in Spring Boot and React",
-          "Managed CI pipelines and code quality"
+          "Maintained and enhanced legacy enterprise Java applications, ensuring robust performance, security, and optimized compute costs",
+          "Developed and implemented new features in Spring Boot, React, Java 11+, Kotlin, Maven, Gradle, and REST APIs"
         ]}
       />
       <Experience 
         company="Wells Fargo"
         role="Android Developer"
-        period="Dec 2021 - Jul 2023"
-        location="San Francisco, CA / Remote"
+        period="Dec 2021 – Jul 2023"
+        location="Remote/San Francisco"
         responsibilities={[
-          "Contributed to Android app redevelopment (10M+ downloads)",
-          "Implemented deep linking and Zelle API integration",
-          "Launched LifeSync financial planning tool"
+          "Led the full redevelopment of the Android application, transitioning all features from Java/WebView to full native Kotlin functionality, resulting in a 25% increase in app performance",
+          "Built and optimized features using Android SDK, Jetpack Compose, ViewModel, LiveData, RoomDB, DataStore, Retrofit, OkHttp, RxJava, Coroutines, Dagger/Hilt, and Navigation Component"
         ]}
       />
     </Section>
@@ -1291,8 +1333,8 @@ function DownloadSection() {
         Click below to download my resume:
       </div>
       <a 
-        href="/harrison_winkler.pdf" 
-        download="harrison_winkler.pdf"
+        href="/Harry-Winkler.pdf" 
+        download="Harry-Winkler.pdf"
         className="inline-flex items-center px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-600 transition-colors"
       >
         <Download className="w-4 h-4 mr-2" />
