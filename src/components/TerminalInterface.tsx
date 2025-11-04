@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
-import clsx from 'clsx';
 
 import type { CommandEntry } from '../types/terminal';
-import type { ThemeTokens } from '../types/theme';
 
 type TerminalInterfaceProps = {
   history: CommandEntry[];
@@ -11,7 +9,6 @@ type TerminalInterfaceProps = {
   onCommandSubmit: (cmd: string) => void;
   onHistoryNavigate: (direction: 'up' | 'down') => string | undefined;
   availableCommands: string[];
-  theme: ThemeTokens;
 };
 
 export function TerminalInterface({
@@ -21,7 +18,6 @@ export function TerminalInterface({
   onCommandSubmit,
   onHistoryNavigate,
   availableCommands,
-  theme,
 }: TerminalInterfaceProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -118,46 +114,33 @@ export function TerminalInterface({
   };
 
   return (
-    <div className="w-full flex flex-col items-center">
-      <div
-        ref={terminalRef}
-        className={clsx(
-          'terminal-container w-full max-w-4xl rounded-lg border border-neutral-800/70',
-          'scroll-smooth bg-opacity-90 backdrop-blur',
-          'overflow-y-auto px-4 py-5 md:p-6',
-        )}
-        style={{
-          background: theme.terminalBg,
-          color: theme.bodyText,
-        }}
-        onClick={() => inputRef.current?.focus()}
-      >
-        {history.map((entry) => (
-          <div key={entry.id} className="mb-5 last:mb-0">
-            <div className="flex items-center text-sm md:text-base">
-              <span style={{ color: theme.promptUser }}>guest@portfolio</span>
-              <span style={{ color: theme.promptSymbol }}>:</span>
-              <span style={{ color: theme.promptPath }}>~$</span>
-              <span className="ml-2">{entry.command}</span>
+    <div
+      ref={terminalRef}
+      className="fixed inset-0 w-screen h-screen overflow-y-auto bg-black text-white font-mono px-4 py-4"
+      onClick={() => inputRef.current?.focus()}
+    >
+      <div className="flex flex-col min-h-full">
+        <div className="flex-1">
+          {history.map((entry) => (
+            <div key={entry.id} className="mb-4">
+              <div className="flex items-center">
+                <span>$ {entry.command}</span>
+              </div>
+              <div className="mt-2">{entry.output}</div>
             </div>
-            <div className="mt-3 ml-4 text-sm md:text-base leading-relaxed">{entry.output}</div>
-          </div>
-        ))}
+          ))}
+        </div>
 
-        <div className="flex flex-col text-sm md:text-base">
+        <div className="sticky bottom-0 bg-black py-2">
           <div className="flex items-center">
-            <span style={{ color: theme.promptUser }} className="whitespace-nowrap">
-              guest@portfolio
-            </span>
-            <span style={{ color: theme.promptSymbol }}>:</span>
-            <span style={{ color: theme.promptPath }}>~$</span>
+            <span className="mr-2">$</span>
             <input
               ref={inputRef}
               type="text"
               value={currentCommand}
               onChange={(event) => onCommandChange(event.target.value)}
               onKeyDown={handleKeyDown}
-              className="ml-2 flex-1 bg-transparent border-none outline-none text-current caret-current"
+              className="flex-1 bg-transparent border-none outline-none text-white caret-white"
               autoFocus
               spellCheck="false"
               autoComplete="off"
@@ -165,11 +148,8 @@ export function TerminalInterface({
             />
           </div>
           {showSuggestions && suggestions.length > 0 && (
-            <div className="ml-4 mt-2 text-xs md:text-sm opacity-80">
-              <span className="mr-2" style={{ color: theme.subtleText }}>
-                suggestions:
-              </span>
-              <span>{suggestions.join(', ')}</span>
+            <div className="mt-2 text-sm opacity-70">
+              {suggestions.join(', ')}
             </div>
           )}
         </div>
