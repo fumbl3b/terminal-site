@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Palette, RefreshCw, Terminal } from 'lucide-react';
+import { Palette, RefreshCw } from 'lucide-react';
 
 import { AllContentView } from './components/AllContentView';
 import { ChatFrame } from './components/ChatFrame';
@@ -15,7 +15,7 @@ import {
   TerminalProjects,
   TerminalSkills,
 } from './components/TerminalSections';
-import { TypewriterText, CodeTypewriter } from './components/TypewriterText';
+import { CodeTypewriter } from './components/TypewriterText';
 import {
   contactLinks,
   experiences,
@@ -481,7 +481,6 @@ const normalizeGuestbookPayload = (payload: any) => {
 function App() {
   const [history, setHistory] = useState<CommandEntry[]>([]);
   const [currentCommand, setCurrentCommand] = useState('');
-  const [showWelcome, setShowWelcome] = useState(true);
   const [showAllContent, setShowAllContent] = useState(true);
   const [themeKey, setThemeKey] = useState<ThemeKey>('matrix');
   const theme = THEME_PRESETS[themeKey];
@@ -1312,7 +1311,7 @@ function App() {
   );
 
   return (
-    <div className="min-h-screen bg-transparent font-mono text-sm md:text-base">
+    <>
       {showAllContent ? (
         <AllContentView
           theme={theme}
@@ -1325,37 +1324,16 @@ function App() {
           resumeAsset={resumeAsset}
         />
       ) : (
-        <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center px-4 pb-16 pt-10 md:px-8">
-          {showWelcome ? (
-            <div className="mb-8 flex w-full max-w-4xl items-center gap-3 text-base text-white md:text-lg">
-              <Terminal className="h-6 w-6" />
-              <TypewriterText
-                text="Welcome to fumblebee.site. Type 'help' for available commands."
-                onComplete={() => setShowWelcome(false)}
-              />
-            </div>
-          ) : null}
-
-          <TerminalInterface
-            history={history}
-            currentCommand={currentCommand}
-            onCommandChange={setCurrentCommand}
-            onCommandSubmit={handleCommandSubmit}
-            onHistoryNavigate={(direction) => navigateInputHistory(direction)}
-            availableCommands={AVAILABLE_COMMANDS}
-            theme={theme}
-          />
-
-          <button
-            type="button"
-            className="fixed bottom-5 left-1/2 -translate-x-1/2 rounded-lg border border-neutral-700/70 bg-neutral-900/80 px-3 py-1 text-xs uppercase tracking-wide text-neutral-400 transition hover:border-neutral-500 hover:text-white md:text-sm"
-            onClick={() => setShowAllContent(true)}
-          >
-            $ just-show-me-everything
-          </button>
-        </div>
+        <TerminalInterface
+          history={history}
+          currentCommand={currentCommand}
+          onCommandChange={setCurrentCommand}
+          onCommandSubmit={handleCommandSubmit}
+          onHistoryNavigate={(direction) => navigateInputHistory(direction)}
+          availableCommands={AVAILABLE_COMMANDS}
+        />
       )}
-    </div>
+    </>
   );
 }
 
