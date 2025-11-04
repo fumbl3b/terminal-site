@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, lazy, Suspense, memo, useMemo } from 'react';
-import { Terminal, Github, Linkedin, Mail, ChevronRight, Download, RefreshCw, Volume2, VolumeX } from 'lucide-react';
+import { Github, Linkedin, Mail, ChevronRight, Download } from 'lucide-react';
 import { terminalSounds } from './sounds';
 
 // Lazy load heavy components
@@ -229,13 +229,11 @@ function Experience({ company, role, period, location, responsibilities }: {
   );
 }
 
-function TerminalInterface({ history, currentCommand, onCommandChange, onCommandSubmit, soundEnabled, onSoundToggle }: {
+function TerminalInterface({ history, currentCommand, onCommandChange, onCommandSubmit }: {
   history: Command[];
   currentCommand: string;
   onCommandChange: (cmd: string) => void;
   onCommandSubmit: (cmd: string) => void;
-  soundEnabled: boolean;
-  onSoundToggle: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -377,88 +375,78 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
     }
   };
 
-  return (<div className="relative">
-      {/* Sound toggle button */}
-      <button
-        onClick={onSoundToggle}
-        className="absolute top-2 right-2 z-10 p-2 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-green-400 transition-colors"
-        title={soundEnabled ? 'Disable sound effects' : 'Enable sound effects'}
-      >
-        {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-      </button>
-      
-      <div 
-        ref={terminalRef}
-        className="terminal-container bg-black text-green-400 p-4 rounded-md overflow-y-auto h-[calc(100vh-2rem)] max-h-[800px] w-full max-w-4xl mx-auto [scrollbar-width:none] hover:[scrollbar-width:auto]"
-        style={{msOverflowStyle: "none", minWidth: "min(800px, 100vw - 2rem)"}}
-        onClick={() => inputRef.current?.focus()}
-      >
-      {history.map((entry, i) => (
-        <div key={i} className="mb-4">
+  return (
+    <div
+      ref={terminalRef}
+      className="fixed inset-0 w-screen h-screen overflow-y-auto bg-black text-white font-mono px-4 py-4"
+      onClick={() => inputRef.current?.focus()}
+    >
+      <div className="flex flex-col min-h-full">
+        <div className="flex-1">
+          {history.map((entry, i) => (
+            <div key={i} className="mb-4">
+              <div className="flex items-center">
+                <span>$ {entry.command}</span>
+              </div>
+              <div className="mt-2">
+                {entry.isTyping && entry.pendingComponent ? (
+                  <div>Rendering component...</div>
+                ) : (
+                  entry.output
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="sticky bottom-0 bg-black py-2">
           <div className="flex items-center">
-            <span className="text-yellow-400">guest@portfolio</span>
-            <span className="text-gray-400">:</span>
-            <span className="text-blue-400">~$</span>
-            <span className="ml-2">{entry.command}</span>
-          </div>
-          <div className="mt-2 ml-4">
-            {entry.isTyping && entry.pendingComponent ? (
-              <div className="text-gray-400">Rendering component...</div>
-            ) : (
-              entry.output
-            )}
-          </div>
-        </div>
-      ))}
-      <div className="flex flex-col">
-        <div className="flex items-center">
-          <span className="text-yellow-400 whitespace-nowrap">guest@portfolio</span>
-          <span className="text-gray-400">:</span>
-          <span className="text-blue-400">~$</span>
-          <input
-            ref={inputRef}
-            type="text"
-            value={currentCommand}
-            onChange={(e) => {
-              const newValue = e.target.value;
-              const oldValue = currentCommand;
-              onCommandChange(newValue);
-              
-              // Play typing sound when characters are added (not deleted)
-              if (newValue.length > oldValue.length) {
-                // Check if the last character added was a space
-                const lastChar = newValue.charAt(newValue.length - 1);
-                if (lastChar === ' ') {
-                  terminalSounds.playSpacebar();
-                } else {
-                  // Use alternating sounds for variety (every 3rd keystroke uses alt sound)
-                  if (newValue.length % 3 === 0) {
-                    terminalSounds.playKeyPressAlt();
+            <span className="mr-2">$</span>
+            <input
+              ref={inputRef}
+              type="text"
+              value={currentCommand}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                const oldValue = currentCommand;
+                onCommandChange(newValue);
+
+                // Play typing sound when characters are added (not deleted)
+                if (newValue.length > oldValue.length) {
+                  // Check if the last character added was a space
+                  const lastChar = newValue.charAt(newValue.length - 1);
+                  if (lastChar === ' ') {
+                    terminalSounds.playSpacebar();
                   } else {
-                    terminalSounds.playKeyPress();
+                    // Use alternating sounds for variety (every 3rd keystroke uses alt sound)
+                    if (newValue.length % 3 === 0) {
+                      terminalSounds.playKeyPressAlt();
+                    } else {
+                      terminalSounds.playKeyPress();
+                    }
                   }
+                } else if (newValue.length < oldValue.length) {
+                  // Play backspace sound when characters are deleted
+                  terminalSounds.playBackspace();
                 }
-              } else if (newValue.length < oldValue.length) {
-                // Play backspace sound when characters are deleted
-                terminalSounds.playBackspace();
-              }
-            }}
-            onKeyDown={handleKeyDown}
-            className="ml-2 bg-transparent border-none outline-none flex-1 text-green-400 w-full md:w-auto"
-            autoFocus
-            spellCheck="false"
-            autoComplete="off"
-            autoCapitalize="off"
-          />
-        </div>
-        {showSuggestions && suggestions.length > 0 && (
-          <div className="ml-4 mt-2 text-gray-500">
-            Suggestions: {suggestions.join(', ')}
+              }}
+              onKeyDown={handleKeyDown}
+              className="flex-1 bg-transparent border-none outline-none text-white caret-white"
+              autoFocus
+              spellCheck="false"
+              autoComplete="off"
+              autoCapitalize="off"
+            />
           </div>
-        )}
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="mt-2 text-sm opacity-70">
+              {suggestions.join(', ')}
+            </div>
+          )}
+        </div>
       </div>
     </div>
-    </div>)
+  )
 }
 
 
@@ -466,7 +454,6 @@ function TerminalInterface({ history, currentCommand, onCommandChange, onCommand
 function App() {
   const [history, setHistory] = useState<Command[]>([]);
   const [currentCommand, setCurrentCommand] = useState('');
-  const [showWelcome, setShowWelcome] = useState(true);
   const [showAllContent, setShowAllContent] = useState(false);
   const [appStartTime] = useState(Date.now());
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -1895,39 +1882,12 @@ function HelpSection() {
           </button>
         </div>
       ) : (
-        <div className="flex flex-col items-center">
-          {showWelcome ? (
-            <div className="flex items-center mb-8 w-full max-w-4xl mx-auto">
-              <Terminal className="w-6 h-6 mr-2" />
-              <TypewriterText 
-                text="Welcome to fumblebee.site. Type 'help' for available commands." 
-                onComplete={() => {
-                  setShowWelcome(false);
-                  terminalSounds.playBootup();
-                }}
-              />
-            </div>
-          ) : (
-            <div className="w-full flex flex-col items-center">
-              <div className="fixed top-0 left-0 right-0 h-12 bg-gradient-to-b from-black to-transparent z-10 pointer-events-none md:hidden"></div>
-              <TerminalInterface
-                history={history}
-                currentCommand={currentCommand}
-                onCommandChange={setCurrentCommand}
-                onCommandSubmit={handleCommand}
-                soundEnabled={soundEnabled}
-                onSoundToggle={toggleSound}
-              />
-              <div className="fixed bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black to-transparent z-10 pointer-events-none md:hidden"></div>
-            </div>
-          )}
-          <button 
-            onClick={() => setShowAllContent(true)}
-            className="fixed bottom-4 left-1/2 transform -translate-x-1/2 text-gray-500 hover:text-green-400 text-sm border-b border-dashed border-gray-700 pb-1 transition-colors"
-          >
-            $ just-show-me-everything
-          </button>
-        </div>
+        <TerminalInterface
+          history={history}
+          currentCommand={currentCommand}
+          onCommandChange={setCurrentCommand}
+          onCommandSubmit={handleCommand}
+        />
       )}
     </div>
   );
